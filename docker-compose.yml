@@ -4,8 +4,6 @@ services:
 
   server:
     image: deviavir/zenbot:unstable
-    ports:
-      - 80:20087
     volumes:
       - ./conf.js:/app/conf.js
       - ./extensions:/app/extensions
