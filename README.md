@@ -5,14 +5,15 @@
 
 # Zenbot [![Build/Test Status](https://travis-ci.org/DeviaVir/zenbot.svg?branch=master)](https://travis-ci.org/DeviaVir/zenbot) [![Greenkeeper badge](https://badges.greenkeeper.io/DeviaVir/zenbot.svg)](https://greenkeeper.io/)
 
-## Current Status
+## Trạng thái hiện tại
 
-Zenbot 4 is functional, but is having trouble reliably making profit. At this point, **I would recommend against trading with large amounts** until some of these issues can be worked out:
+Zenbot 4 là một chức năng, nhưng sẽ khó khăn trong việc tạo ra lợi nhuận. Ở thời điểm này, **Tôi muốn khuyên bạn là không nên trade với khoản tiền lớn** cho đến khi các vấn đề dưới đây được giải quyết:
 
-- Many people are reporting [losses in live trading](https://github.com/carlos8f/zenbot/issues/189) even if the simulation results and/or paper trading is positive.
-- This is my highest priority right now, since an unprofitable bot is not worth much, but please understand that reliably making profit is hard, and so is making a realistic simulator.
-- The losses may be due to the default strategy not working well in sideways (non-trending) market conditions, slippage during limit order execution, or both. Currently I would recommend against using Zenbot on a market that is non-trending or trending generally downwards.
-- The limit-order strategy that Zenbot uses to avoid taker fees, is prone to race conditions and delays. A mode for using market-type orders will probably need to be made, which may make frequent-trade strategies less viable due to fees, but more reliable execution overall.
+- Có nhiều người đã báo cáo là [đã thua lỗ trong live trading](https://github.com/carlos8f/zenbot/issues/189) ngay cả khi kết quả mô phỏng là tích cực.
+- Đây là ưu tiên hàng đầu của tôi ngay lúc này, vì là 1 con bot không lợi nhuận. Tuy nhiên xin hãy hiểu rằng việc tạo ra lợi nhuận thì rất là khó khăn hơn là tạo ra 1 mô phỏng thực tế.
+- Việc thua lỗ có thể là do chiến lược mặc định(`default strategy`) không hoạt động tốt trong điều kiện thị trường đi ngang (non-trending), hoặc là do độ trễ trong giao dịch hoặc là cả hai. Hiện tại thì tôi khuyên bạn không nên sử dụng Zenbot khi mà thị trường non-trending hoặc là thị trường đang có xu hướng giảm.
+- Để tránh mất phí cho người dùng thì Zenbot sử dụng chiến thuật limit-order, nhưng nó dễ bị trễ(delays). 
+~~- The limit-order strategy that Zenbot uses to avoid taker fees, is prone to race conditions and delays. A mode for using market-type orders will probably need to be made, which may make frequent-trade strategies less viable due to fees, but more reliable execution overall.~~
 - An upcoming feature will allow Zenbot to use a limited amount of your balance, which will help with experimenting with live trading, but mitigating the possible losses from the issues above.
 
 Zenbot is a hobby project for me and I'm sorry that I can't devote myself full-time to it. Since I'm getting busier, development may slow down a bit from here, so please be patient if issues aren't fixed right away.
