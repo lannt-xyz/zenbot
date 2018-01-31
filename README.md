@@ -28,124 +28,82 @@ Zenbot là 1 trading bot dùng để trade cryptocurrency bằng command-line, �
 
 - Giao dịch hoàn toàn tự động dựa trên [phân tích kỹ thuật](http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:introduction_to_technical_indicators_and_oscillators)
 - Hỗ trợ hoàn toàn cho [GDAX](https://gdax.com/), [Poloniex](https://poloniex.com), [Kraken](https://kraken.com/), [Bittrex](https://bittrex.com/), [Quadriga](https://www.quadrigacs.com), [Gemini](https://www.gemini.com), [Bitfinex](https://www.bitfinex.com), [CEX.IO](https://cex.io/trade) và [Bitstamp](https://www.bitstamp.net/), và đang tiến hành cho những sàn giao dịch khác
-- Plugin architecture for implementing exchange support, or writing new strategies
 - Kiến trúc dạng plugin để hiện thực việc hỗ trợ các sàn giao dịch và viết thêm chiến lược mới.
 - Simulator dùng cho [chiến lược Backtesting](https://gist.github.com/carlos8f/b09a734cf626ffb9bb3bcb1ca35f3db4) chống lại dữ liệu lịch sử
-- Chế độ trading "Paper", hoạt động trên mô phỏng dựa trên số dư khi xem thị trường sống
-- Configurable sell stops, buy stops, and (trailing) profit stops
-- Flexible sampling period and trade frequency - averages 1-2 trades/day with 1h period, 15-50/day with 5m period
+- Chế độ trading "Paper", hoạt động trên mô phỏng dựa trên số dư khi xem live trading
+- Có thể cấu hình cho sell stops, buy stops, và (trailing) profit stops
+- Thời kỳ lấy mẫu linh hoạt và tần suất trade - trung bình 1-2 trades/ngày trong khoảng 1h, 15-50/ngày trong khoảng 5m
 
 ## Disclaimer
 
-- Zenbot is NOT a sure-fire profit machine. Use it AT YOUR OWN RISK.
-- Crypto-currency is still an experiment, and therefore so is Zenbot. Meaning, both may fail at any time.
-- Running a bot, and trading in general requires careful study of the risks and parameters involved. A wrong setting can cause you a major loss.
-- Never leave the bot un-monitored for long periods of time. Zenbot doesn't know when to stop, so be prepared to stop it if too much loss occurs.
-- Often times the default trade parameters will underperform vs. a buy-hold strategy, so run some simulations and find the optimal parameters for your chosen exchange/pair before going "all-in".
+- Zenbot thì ko phải là 1 cổ máy sinh lợi nhuận vì vậy nếu sử dụng thì hãy chấp nhận rủi ro
+- Crypto-currency thì vẫn đang dc thí nghiệm, và Zenbot thì cũng như vậy. Nghĩa là cả 2 đều có thể `hy sinh` bất cú lúc nào.
+- Chạy 1 con bot và trade nói chung cần nghiên cứu cẩn thận về các rủi ro và các thông số liên quan. Một thiết lập sai có thể gây ra một sự mất mát lớn.
+- Đừng quên theo dõi Zenbot trong thời gian dài. Zenbot nó ko biết khi nào nên dừng, do đó hãy sẵn sàng để ngăn chặn nó nếu quá nhiều mất mát xảy ra.
+- Thường thì các thông số thương mại mặc định sẽ kém hơn so với chuiến thuật buy-hold. Do đó, hãy chạy một số mô phỏng và tìm các thông số tối ưu cho bạn trước khi "all-in".
 
-## Quick-start
+## Khởi động
 
-### Step 1) Requirements
+### Step 1) Yêu cầu
 
-- Windows / Linux / macOS 10 (or Docker)
-- [Node.js](https://nodejs.org/) (version 8.3.0 or higher) and [MongoDB](https://www.mongodb.com/).
+- Git
+- Docker
 
-### Step 2) Install zenbot 4
+### Step 2) Cài đặt và cấu hình
 
-Run in your console,
-
-```
-git clone https://github.com/deviavir/zenbot.git
-```
-
-Or, without git,
+Checkout source code
 
 ```
-wget https://github.com/deviavir/zenbot/archive/master.tar.gz
-tar -xf zenbot-master.tar.gz
-mv zenbot-master zenbot
+git clone https://github.com/anrewkaka/zenbot.git
 ```
 
-Create your configuration file by copying `conf-sample.js` to `conf.js`:
+Tạo file thiết lập `conf-sample.js` thành `conf.js`:
 
 ```
 cp conf-sample.js conf.js
 ```
 
-- View and edit `conf.js`.
-- It's possible to use zenbot in "paper trading" mode without making any changes.
-- You must add your exchange API keys to enable real trading however.
-- API keys do NOT need deposit/withdrawl permissions.
+- Chỉnh sửa `conf.js`.
+- Có thể sử dụng Zenbot trong chế độ "paper trading" mà ko cần bất kỳ thay đổi nào.
+- Bạn cần add exchange API keys để trade thực tế.
+- API keys thì ko cần quyền deposit/withdrawl.
 
-If using Docker, skip to section "Docker" below.
+### Chạy Zenbot
 
-Install dependencies:
+Cần thiết cài đặt Docker, DockerCompose theo như hướng dẫn ở [đây](https://docs.docker.com/compose/install/)
 
-```
-cd zenbot
-npm install
-# optional, installs the `zenbot.sh` binary in /usr/local/bin:
-npm link
-```
-
-### Ubuntu 16.04 Step-By-Step
-[Video](https://youtu.be/BEhU55W9pBI)
-[Blog Post](https://jaynagpaul.com/algorithmic-crypto-trading?utm_source=zenbot)
-
-```
-sudo apt-get update
-sudo apt-get upgrade -y
-sudo apt-get install build-essential mongodb -y
-
-curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-git clone https://github.com/deviavir/zenbot.git
-cd zenbot
-npm install
-
-./zenbot.sh trade --paper
-```
-Please note; npm link will not work as forex.analytics is built from source.
-
-### Docker (Optional)
-
-To run Zenbot under Docker, install Docker, Docker Compose, Docker Machine (if necessary) You can follow instructions at https://docs.docker.com/compose/install/
-
-After installing (step 2 above),
+Sau khi cài đặt thì chạy Zenbot
 
 ```
 cd zenbot
-docker-compose up (-d if you don't want to see the log)
+docker-compose up (gắn option -d nếu ko muốn hiển thị log)
 ```
 
-If you are running windows use the following command
+Nếu mà dùng docker trên windows thì thực thi bằng command bên dưới.
 
 ```
 docker-compose --file=docker-compose-windows.yml up
 ```
 
-If you wish to run commands (e.g. backfills, list-selectors), you can run this separate command after a successful `docker-compose up -d`:
+Nếu muốn chạy command (e.g. backfills, list-selectors), thì cũng có thể thực hiện sau khi hoàn thành command `docker-compose up -d`:
 
 ```
 docker-compose exec server zenbot list-selectors
 docker-compose exec server zenbot backfill <selector> --days <days>
 ```
 
-#### Updating docker
+#### Cập nhật docker
 
-In case you are behind on updates, you can run:
+Thực thi command bến dưới để cập nhật docker
+
 ```
 docker pull deviavir/zenbot:unstable
 ```
-And re-run `docker-compose up -d` to start the new image.
-
-`deviavir/zenbot` is automatically updated after every merge.
-You can follow the tags/builds here: https://hub.docker.com/r/deviavir/zenbot/builds/
+và sau đó thực thi `docker-compose up -d` để bắt đầu với image mới.
 
 ## Selectors
 
-A "selector" is a short identifier that tells Zenbot which exchange and currency pair to act on. Use the form `{exchange_slug}.{asset}-{currency}`. A complete list of selectors your Zenbot install supports can be found with:
+`selector` là định danh để Zenbot biết được sẽ hoặt động trên sàn giao dịch nào và cặp tiền tệ nào. Sử dụng format là `{exchange_slug}.{asset}-{currency}`. Có thể xem list `selector` mà Zenboot hỗ trợ bằng command bên dưới:
 
 ```
 zenbot list-selectors
@@ -169,7 +127,7 @@ poloniex:
 ...etc
 ```
 
-## Run a simulation for your selector
+## Chạy simulator cho `selector`
 
 To backfill data (provided that your chosen exchange supports it), use:
 
