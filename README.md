@@ -12,24 +12,26 @@ Zenbot 4 là một chức năng, nhưng sẽ khó khăn trong việc tạo ra l�
 - Có nhiều người đã báo cáo là [đã thua lỗ trong live trading](https://github.com/carlos8f/zenbot/issues/189) ngay cả khi kết quả mô phỏng là tích cực.
 - Đây là ưu tiên hàng đầu của tôi ngay lúc này, vì là 1 con bot không lợi nhuận. Tuy nhiên xin hãy hiểu rằng việc tạo ra lợi nhuận thì rất là khó khăn hơn là tạo ra 1 mô phỏng thực tế.
 - Việc thua lỗ có thể là do chiến lược mặc định(`default strategy`) không hoạt động tốt trong điều kiện thị trường đi ngang (non-trending), hoặc là do độ trễ trong giao dịch hoặc là cả hai. Hiện tại thì tôi khuyên bạn không nên sử dụng Zenbot khi mà thị trường non-trending hoặc là thị trường đang có xu hướng giảm.
-- Để tránh mất phí cho người dùng thì Zenbot sử dụng chiến thuật limit-order, nhưng nó dễ bị trễ(delays). 
-~~- The limit-order strategy that Zenbot uses to avoid taker fees, is prone to race conditions and delays. A mode for using market-type orders will probably need to be made, which may make frequent-trade strategies less viable due to fees, but more reliable execution overall.~~
-- An upcoming feature will allow Zenbot to use a limited amount of your balance, which will help with experimenting with live trading, but mitigating the possible losses from the issues above.
+- Chiến lược `limit-order` mà Zenbot sử dụng để tránh lệ phí của taker, có xu hướng bị điều kiện và sự chậm trễ. Một chế độ sử dụng `markte-type` có lẽ sẽ cần phải được thực hiện, có thể làm cho các chiến lược `frequent-trade` ít khả thi hơn do phí, nhưng thực hiện đáng tin cậy hơn.
+- Một tính năng sắp tới sẽ cho phép Zenbot sử dụng một số lượng hạn chế số dư của bạn, thứ mà sẽ giúp ích cho việc thử nghiệm giao dịch live trading, đồng thời giảm thiểu những tổn thất có thể xảy ra từ các yêu cầu nêu trên.
 
-Zenbot is a hobby project for me and I'm sorry that I can't devote myself full-time to it. Since I'm getting busier, development may slow down a bit from here, so please be patient if issues aren't fixed right away.
+Zenbot là một dự án sở thích cho tôi và tôi xin lỗi vì tôi không thể cống hiến bản thân mình toàn thời gian cho nó. Vì tôi trở nên bận rộn, sự phát triển có thể chậm lại một chút từ đây, vì vậy hãy kiên nhẫn nếu các sự cố không được khắc phục ngay.
 
-## Questions
-Please ask (programming) questions related to zenbot on stackoverflow. The tag is [zenbot](https://stackoverflow.com/questions/tagged/zenbot).
+## Câu hỏi
+Vui lòng hởi những câu hỏi liên quan đến lập trình Zenbot tại stackoverflow với tag là [zenbot](https://stackoverflow.com/questions/tagged/zenbot).
 
-## Description
+## Mô tả
 
-Zenbot is a command-line cryptocurrency trading bot using Node.js and MongoDB. It features:
+Zenbot là 1 trading bot dùng để trade cryptocurrency bằng command-line, được xây dựng bằng Node.js và MongoDB.
 
-- Fully-automated [technical-analysis](http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:introduction_to_technical_indicators_and_oscillators)-based trading approach
-- Full support for [GDAX](https://gdax.com/), [Poloniex](https://poloniex.com), [Kraken](https://kraken.com/), [Bittrex](https://bittrex.com/), [Quadriga](https://www.quadrigacs.com), [Gemini](https://www.gemini.com), [Bitfinex](https://www.bitfinex.com), [CEX.IO](https://cex.io/trade) and [Bitstamp](https://www.bitstamp.net/), work on further exchange support is ongoing.
+### Chức năng
+
+- Giao dịch hoàn toàn tự động dựa trên [phân tích kỹ thuật](http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:introduction_to_technical_indicators_and_oscillators)
+- Hỗ trợ hoàn toàn cho [GDAX](https://gdax.com/), [Poloniex](https://poloniex.com), [Kraken](https://kraken.com/), [Bittrex](https://bittrex.com/), [Quadriga](https://www.quadrigacs.com), [Gemini](https://www.gemini.com), [Bitfinex](https://www.bitfinex.com), [CEX.IO](https://cex.io/trade) và [Bitstamp](https://www.bitstamp.net/), và đang tiến hành cho những sàn giao dịch khác
 - Plugin architecture for implementing exchange support, or writing new strategies
-- Simulator for [Backtesting strategies](https://gist.github.com/carlos8f/b09a734cf626ffb9bb3bcb1ca35f3db4) against historical data
-- "Paper" trading mode, operates on a simulated balance while watching the live market
+- Kiến trúc dạng plugin để hiện thực việc hỗ trợ các sàn giao dịch và viết thêm chiến lược mới.
+- Simulator dùng cho [chiến lược Backtesting](https://gist.github.com/carlos8f/b09a734cf626ffb9bb3bcb1ca35f3db4) chống lại dữ liệu lịch sử
+- Chế độ trading "Paper", hoạt động trên mô phỏng dựa trên số dư khi xem thị trường sống
 - Configurable sell stops, buy stops, and (trailing) profit stops
 - Flexible sampling period and trade frequency - averages 1-2 trades/day with 1h period, 15-50/day with 5m period
 
