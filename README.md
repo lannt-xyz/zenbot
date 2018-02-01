@@ -129,44 +129,44 @@ poloniex:
 
 ## Chạy simulator cho `selector`
 
-To backfill data (provided that your chosen exchange supports it), use:
+Để xây dựng data thì thực thi command như bên dưới (chọn sàn giao dịch mà có hỗ trợ):
 
 ```
 zenbot backfill <selector> --days <days>
 ```
 
-You can also select start and end date:
+Bạn cũng có thể chọn ngày bắt đầu(start) và ngày kết thúc(end):
 
 ```
 zenbot backfill <selector> --start="YYYYMMDDhhmm" --end="YYYYMMDDhhmm"
 ```
-Note you can use them separately.
+Hãy nhớ rằng bạn cũng có thể sử dụng chúng tách biệt với nhau.
 
-After you've backfilled, you can run a simulation:
+Sau khi data đã được xây dựng thì bạn có thể chạy mô phỏng:
 
 ```
 zenbot sim <selector> [options]
 ```
 
-For a list of options for the `sim` command, use:
+Để hiển thị các tùy chọn của `sim` thì dùng command bên dưới:
 
 ```
 zenbot sim --help
 
 ```
 
-For additional options related to the strategy, use:
+Để biết các chiến thuật thì dùng command bên dưới:
 
 ```
 zenbot list-strategies
 ```
 
-- By default the sim will start with 1000 units of currency. Override with `--currency_capital` and `--asset_capital`.
-- Open `sim_result.html` in your browser to see a candlestick graph with trades.
+- Mặc định thì `sim` sẽ thực thi với 1000 đơn vị currency. Để thay đổi thì dùng options `--currency_capital` và `--asset_capital`.
+- Mở file `sim_result.html` trên browser để xem biểu đồ.
 
-### Screenshot and example result
+### Screenshot và kết quả ví dụ
 
-Zenbot outputs an HTML graph of each simulation result. In the screenshot below, the pink arrows represent the bot buying (up arrow) and selling (down arrow) as it iterated the historical data of [GDAX](https://gdax.com/) exchange's BTC/USD product.
+Zenbot đưa ra một biểu đồ HTML của mỗi kết quả mô phỏng. Trong ảnh chụp màn hình bên dưới, mũi tên màu hồng tượng trưng cho việc mua bot (mũi tên lên) và bán (mũi tên xuống) khi nó lặp lại dữ liệu lịch sử của sản phẩm BTC / USD của [GDAX](https://gdax.com/).
 
 ![screenshot](https://cloud.githubusercontent.com/assets/106763/25983930/7e5f9436-369c-11e7-971b-ba2916442eea.png)
 
@@ -177,10 +177,10 @@ vs. buy hold 61.06%
 110 trades over 91 days (avg 1.21 trades/day)
 ```
 
-Zenbot started with $1,000 USD and ended with $2,954.50 after 90 days, making 195% ROI! In spite of a buy/hold strategy returning a respectable 83.44%, Zenbot has considerable potential for beating buy/holders.
+Zenbot bắt đầu với $1,000 USD và kết thúc với $2,954.50 sau 90 ngày, tạo 195% lợi nhuận! Mặc dù chiến lược buy/holders đã mang lại 83.44%, Zenbot có tiềm năng lớn trong việc đánh bại buy/holders.
 
-- Note that this example used tweaked settings to achieve optimal return: `--profit_stop_enable_pct=10`, `--profit_stop_pct=4`, `--trend_ema=36`, and `--sell_rate=-0.006`. Default parameters yielded around 65% ROI.
-- [Raw data](https://gist.github.com/carlos8f/b09a734cf626ffb9bb3bcb1ca35f3db4) from simulation
+- Lưu ý rằng ví dụ này sử dụng các thiết lập tinh chỉnh để đạt được sự nhận được tối ưu: `--profit_stop_enable_pct=10`, `--profit_stop_pct=4`, `--trend_ema=36`, và `--sell_rate=-0.006`. Tham số mặc định đem lại khoảng 65% lợi nhuận.
+- [Dữ liệu nguyên thủy](https://gist.github.com/carlos8f/b09a734cf626ffb9bb3bcb1ca35f3db4) từ việc mô phỏng
 
 ## Running zenbot
 
