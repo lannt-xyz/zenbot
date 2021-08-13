@@ -18,5 +18,7 @@ COPY --chown=node --from=builder /app/node_modules /app/node_modules/
 USER node
 ENV NODE_ENV production
 
+RUN npm install && npm audit fix
+
 ENTRYPOINT ["/usr/local/bin/zenbot"]
 CMD ["trade","--paper"]
