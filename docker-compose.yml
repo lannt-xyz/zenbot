@@ -8,17 +8,28 @@ services:
     volumes:
       - ./simulations/:/app/simulations/
       - ./conf.js:/app/conf.js:ro
+      - ./extensions/:/app/extensions/
     restart: always
     tty: true
     ports:
-      - "17365:17365"
+      - 8080:8080
     depends_on:
       - mongodb
     environment:
       - ZENBOT_MONGODB_HOST=mongodb
+      - ZENBOT_API_PORT=8080
+      - ZENBOT_DEFAULT_SELECTOR=hitbtc.ltc-usdt
+      - ZENBOT_DEFAULT_STRATEGY=trend_ema
+      - ZENBOT_PROFIT_STOP_ENABLE_PCT=10
+      - ZENBOT_PROFIT_STOP_PCT=1
+      - CUSTOM_PERIOD=1m
+      - CUSTOM_EMA_RATE=5
+      - CUSTOM_SELL_RATE=-0.006
     stdin_open: true
+    command: trade --paper
   mongodb:
     image: mongo:latest
+    restart: always
     volumes:
       - ./database:/data/db
     command: mongod --bind_ip=0.0.0.0 --logpath=/dev/null
