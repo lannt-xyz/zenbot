@@ -4,849 +4,580 @@
  * Clifford Roche <clifford.roche@gmail.com>
  * 07/01/2017
  *
- * Example: ./darwin.js --selector="bitfinex.ETH-USD" --days="10" --currency_capital="5000" --use_strategies="all | macd,trend_ema,etc" --population="101" --population_data="simulations/generation_data_NUMBERS_gen_X.json"
+ * Example: ./darwin.js --selector="bitfinex.ETH-USD" --days="10" --currency_capital="5000" --use_strategies="all | macd,trend_ema,etc" --population="101" --population_data="simulations/generation_data_NUMBERS"
+ * Params:
+ * --use_strategies=<strategy_name>       One or more strategies comma separated. Requires at least one named strategy. 
+ * --population_data=<filename>           The filename used for continuing backtesting from a previous run.
+ * --generateLaunch=<true>|<false>        Generate .sh and .bat files using the best generation discovered.
+ * --ignoreLaunchFitness=<true>|<false>   If used with --generateLaunch it will always write a new launch file regardless of if the latest fitness is greater.
+ * --floatScanWindow                      Time window used for analyzing data be adjusted for every generation.
+ * --population=<int>                     Population per strategy.
+ * --maxCores=<int>                       Maximum processes to execute at a time. Default is the # of cpu cores in the system.
+ * --selector=<exchange.marketPair>       The exchange and market pair to target. For example, --selector=gdax.BTC-USDC for Coinbase Pro market with Bitcoin-USDCoin pair.
+ * --asset_capital=<float>                Amount of coin available to the simulator to start with.
+ * --currency_capital=<float>             Amount of capital/base currency available to the sim to start with.
+ * --days=<int>                           Amount of days to use when backfilling. 
+ * --noStatSave=<true>|<false>            Set to true and statistics will not be saved to the simulation folder.
+ * --silent=<true>|<false>                Setting to true may improve performance.
+ * --runGenerations=<int>                 Set the number of generations to be used. Count shown is zero based so, count + 1 = # of generations.
+ * --minTrades=<int>                      Minimum number of wins before generation is considured fit to evolve.
+ * --fitnessCalcType=<wl / profit / classic / profitwl> Default: Classic. wl will score the highes for wins and losses, profit doesn't care about wins and losses only the higest end balance, classic uses original claculation / profitwl tries to get the highest profit using the lowest win/loss ratio
+ *
+ *
+ * Any parameters for sim and/or strategy can be passed in and will override the genetic test generated parameters.
+ * i.e. if --period_length=1m is passed all tests will be performed using --period_length=1m instead of trying to find that parameter.
+ *
  */
 
-let shell = require('shelljs')
 let parallel = require('run-parallel-limit')
-let json2csv = require('json2csv')
-let roundp = require('round-precision')
+let Json2csvParser = require('json2csv').Parser
 let fs = require('fs')
 let GeneticAlgorithmCtor = require('geneticalgorithm')
-let StripAnsi = require('strip-ansi')
 let moment = require('moment')
 let path = require('path')
+// eslint-disable-next-line no-unused-vars
+let colors = require('colors')
+let Phenotypes = require('../../lib/phenotype')
+let Backtester = require('../../lib/backtester')
+let argv = require('yargs').argv
+let z = require('zero-fill')
+let n = require('numbro')
 
-let Phenotypes = require('./phenotype.js')
 
-let VERSION = 'Zenbot 4 Genetic Backtester v0.2.1'
+let VERSION = 'Zenbot 4 Genetic Backtester v0.2.3'
 
 let PARALLEL_LIMIT = (process.env.PARALLEL_LIMIT && +process.env.PARALLEL_LIMIT) || require('os').cpus().length
 
-let TREND_EMA_MIN = 20
-let TREND_EMA_MAX = 20
-
-let OVERSOLD_RSI_MIN = 20
-let OVERSOLD_RSI_MAX = 35
-
-let OVERSOLD_RSI_PERIODS_MIN = 15
-let OVERSOLD_RSI_PERIODS_MAX = 25
-
-let NEUTRAL_RATE_MIN = 10
-let NEUTRAL_RATE_MAX = 10
-
-let NEUTRAL_RATE_AUTO = false
-
 let iterationCount = 0
 
+let selectedStrategies
+let pools = {}
+let simArgs
+let populationSize = 0
+let generationCount = 1
+let runGenerations = undefined
+let generationProcessing = false
+let population_data = ''
+let noStatSave = false
+//let floatScanWindow = false
+let ignoreLaunchFitness = false
+let minimumTrades = 0
+let fitnessCalcType = 'classic'
 
-let runCommand = (taskStrategyName, phenotype, cb) => {
-  var cmdArgs = Object.assign({}, phenotype)
-  cmdArgs.strategy = taskStrategyName
-  Object.assign(cmdArgs, simArgs)
+let readSimDataFile = (iteration) => {
+  let jsonFileName = `simulations/${population_data}/gen_${generationCount}/sim_${iteration}.json`
 
-  var selector = cmdArgs.selector
-  delete cmdArgs.selector
-  delete cmdArgs.sim
-
-  let zenbot_cmd = process.platform === 'win32' ? 'zenbot.bat' : './zenbot.sh'
-  let command = `${zenbot_cmd} sim ${selector}`
-
-  for (const [ key, value ] of Object.entries(cmdArgs)) {
-    command += ` --${key}=${value}`
+  if (fs.existsSync(jsonFileName)) {
+    let simData = JSON.parse(fs.readFileSync(jsonFileName, { encoding: 'utf8' }))
+    return simData
   }
+  else {
+    return null
+  }
+}
 
-  console.log(`[ ${iterationCount++}/${populationSize * selectedStrategies.length} ] ${command}`)
+let writeSimDataFile = (iteration, data) => {
+  let jsonFileName = `simulations/${population_data}/gen_${generationCount}/sim_${iteration}.json`
+  Backtester.writeFileAndFolder(jsonFileName, data)
+}
 
-  phenotype['sim'] = {}
-
-
-  shell.exec(command, {
-    silent: true,
-    async: true
-  }, (code, stdout, stderr) => {
-    if (code) {
-      console.error(command)
-      console.error(stderr)
-      return cb(null, null)
-    }
-
-    let result = null
-    try {
-      result = processOutput(stdout,taskStrategyName,phenotype)
-      phenotype['sim'] = result
-      result['fitness'] = Phenotypes.fitness(phenotype)
-    } catch (err) {
-      console.log('Bad output detected', err.toString())
-      console.log(stdout)
-    }
-
-    cb(null, result)
+function allStrategyNames() {
+  let pathName = path.resolve(__dirname, '..', '..', 'extensions', 'strategies')
+  return fs.readdirSync(pathName).filter(function (file) {
+    return fs.statSync(pathName + '/' + file).isDirectory()
   })
 }
 
-let runUpdate = (days, selector) => {
-  let zenbot_cmd = process.platform === 'win32' ? 'zenbot.bat' : './zenbot.sh'
-  let command = `${zenbot_cmd} backfill --days=${days} ${selector}`
-  console.log('Backfilling (might take some time) ...')
-  console.log(command)
+function isUsefulKey(key) {
+  if (key == 'filename' || key == 'show_options' || key == 'sim') return false
+  return true
+}
 
-  shell.exec(command, {
-    silent: true,
-    async: false
+function generateCommandParams(input) {
+  if (!isUndefined(input) && !isUndefined(input.params)) {
+    input = input.params.replace('module.exports =', '')
+  }
+
+  input = JSON.parse(input)
+
+  var result = ''
+  var keys = Object.keys(input)
+  for (let i = 0; i < keys.length; i++) {
+    var key = keys[i]
+    if (isUsefulKey(key)) {
+      // selector should be at start before keys
+      if (key == 'selector') {
+        result = input[key] + result
+      }
+
+      else result += ' --' + key + '=' + input[key]
+    }
+  }
+  return result
+}
+
+function saveGenerationData(csvFileName, jsonFileName, dataCSV, dataJSON) {
+  try {
+    fs.writeFileSync(csvFileName, dataCSV)
+    console.log('> Finished writing generation csv to ' + csvFileName)
+  }
+  catch (err) {
+    throw err
+  }
+
+  try {
+    fs.writeFileSync(jsonFileName, dataJSON)
+    console.log('> Finished writing generation json to ' + jsonFileName)
+  }
+  catch (err) {
+    throw err
+  }
+}
+
+// Find the first incomplete generation of this session, where incomplete means no "results" files
+while (fs.existsSync(`simulations/${population_data}/gen_${generationCount}`)) {
+  generationCount++
+}
+generationCount--
+
+if (generationCount > 0 && !fs.existsSync(`simulations/${population_data}/gen_${generationCount}/results.csv`)) {
+  generationCount--
+}
+
+function saveLaunchFiles(saveLauchFile, configuration) {
+  if (!saveLauchFile) return
+  //let lConfiguration = configuration.replace(' sim ', ' trade ')
+  let lFilenameNix = new String().concat('./gen.', configuration.selector.toLowerCase(), '.sh')
+  let lFinenamewin32 = new String().concat('./gen.', configuration.selector.toLowerCase(), '.bat')
+  delete configuration.generateLaunch
+  delete configuration.backtester_generation
+
+  let bestOverallCommand = generateCommandParams(configuration)
+  let lastFitnessLevel = -9999.0
+
+  // get prior fitness level nix
+  if (fs.existsSync(lFilenameNix)) {
+    let lFileCont = fs.readFileSync(lFilenameNix, { encoding: 'utf8', flag: 'r' })
+    let lines = lFileCont.split('\n')
+    if (lines.length > 2)
+      if (lines[1].includes('fitness=')) {
+        let th = lines[1].split('=')
+        lastFitnessLevel = th[1]
+      }
+  }
+
+  // get prior firness level win32
+  if (fs.existsSync(lFinenamewin32)) {
+    let lFileCont = fs.readFileSync(lFinenamewin32, { encoding: 'utf8', flag: 'r' })
+    let lines = lFileCont.split('\n')
+    if (lines.length > 1)
+      if (lines[1].includes('fitness=')) {
+        let th = lines[1].split('=')
+        lastFitnessLevel = th[1]
+      }
+  }
+
+  //write Nix Version
+  let lNixContents = '#!/bin/bash\n'.concat('#fitness=', configuration.fitness, '\n',
+    'env node zenbot.js trade ',
+    bestOverallCommand, ' $@\n')
+
+  let lWin32Contents = '@echo off\n'.concat('rem fitness=', configuration.fitness, '\n',
+    'node zenbot.js trade ',
+    bestOverallCommand, ' %*\n')
+
+  if (((Number(configuration.fitness) > Number(lastFitnessLevel)) || (ignoreLaunchFitness)) && Number(configuration.fitness) > 0.0) {
+    fs.writeFileSync(lFilenameNix, lNixContents)
+    fs.writeFileSync(lFinenamewin32, lWin32Contents)
+    // using the string instead of octet as eslint compaines about an invalid number if the number starts with 0
+    fs.chmodSync(lFilenameNix, '777')
+    fs.chmodSync(lFinenamewin32, '777')
+  }
+}
+
+let cycleCount = -1
+
+function isUndefined(variable) {
+  return typeof variable === typeof undefined
+}
+
+function simulateGeneration(generateLaunchFile) {
+  generationProcessing = true
+
+  // Find the first incomplete generation of this session, where incomplete means no "results" files
+  while (fs.existsSync(`simulations/${population_data}/gen_${generationCount}`)) {
+    generationCount++
+  }
+
+  generationCount--
+
+  if (generationCount > 0 && !fs.existsSync(`simulations/${population_data}/gen_${generationCount}/results.csv`)) {
+    generationCount--
+  }
+
+  if (noStatSave) {
+    cycleCount++
+    generationCount = cycleCount
+  }
+
+  let ofGenerations = (!isUndefined(runGenerations)) ? `of ${runGenerations}` : ''
+
+  console.log(`\n\n=== Simulating generation ${++generationCount} ${ofGenerations} ===\n`)
+  Backtester.resetMonitor()
+  Backtester.ensureBackfill()
+
+  iterationCount = 0
+
+  let tasks = selectedStrategies.map(v => pools[v]['pool'].population().map(phenotype => {
+    return cb => {
+      phenotype.backtester_generation = iterationCount
+      phenotype.exchangeMarketPair = argv.selector
+      Backtester.trackPhenotype(phenotype)
+
+      var command
+      let simData = readSimDataFile(iterationCount)
+
+      if (simData) {
+        if (simData.result) {
+          // Found a complete and cached sim, don't run anything, just forward the results of it
+          phenotype['sim'] = simData.result
+          iterationCount++
+          return cb(null, simData.result)
+        }
+        else {
+          command = {
+            iteration: iterationCount,
+            commandString: simData.commandString,
+            queryStart: moment(simData.queryStart),
+            queryEnd: moment(simData.queryEnd)
+          }
+        }
+      }
+
+      if (!command) {
+        // Default flow, build the command to run, and cache it so there's no need to duplicate work when resuming
+        command = Backtester.buildCommand(v, phenotype, `simulations/${population_data}/gen_${generationCount}/sim_${iterationCount}_result.html`)
+        command.iteration = iterationCount
+        writeSimDataFile(iterationCount, JSON.stringify(command))
+      }
+
+      iterationCount++
+      phenotype.minTrades = minimumTrades
+      phenotype.fitnessCalcType = fitnessCalcType
+      Backtester.runCommand(v, phenotype, command, cb)
+    }
+  })).reduce((a, b) => a.concat(b))
+
+  Backtester.startMonitor()
+
+  parallel(tasks, PARALLEL_LIMIT, (err, results) => {
+    Backtester.stopMonitor(`Generation ${generationCount}`)
+
+    results = results.filter(function (r) {
+      return !!r
+    })
+
+    results.sort((a, b) => (Number(a.fitness) < Number(b.fitness)) ? 1 : ((Number(b.fitness) < Number(a.fitness)) ? -1 : 0))
+
+    const fields = [
+      {
+        "label": "Selector",
+        "value": "selector"
+      },
+      {
+        "label": "Fitness",
+        "value": "fitness"
+      },
+      {
+        "label": "VS Buy Hold (%)",
+        "value": "vsBuyHold"
+      },
+      {
+        "label": "Win/Loss Ratio",
+        "value": "wlRatio"
+      },
+      {
+        "label": "# Trades/Day",
+        "value": "frequency"
+      },
+      {
+        "label": "Strategy",
+        "value": "strategy"
+      },
+      {
+        "label": "Order Type",
+        "value": "order_type"
+      },
+      {
+        "label": "Ending Balance ($)",
+        "value": "endBalance"
+      },
+      {
+        "label": "Buy Hold ($)",
+        "value": "buyHold"
+      },
+      {
+        "label": "# Wins",
+        "value": "wins"
+      },
+      {
+        "label": "# Losses",
+        "value": "losses"
+      },
+      {
+        "label": "Period",
+        "value": "period_length"
+      },
+      {
+        "label": "Min Periods",
+        "value": "min_periods"
+      },
+      {
+        "label": "# Days",
+        "value": "days"
+      },
+      {
+        "label": "Full Parameters",
+        "value": "params"
+      }
+    ]
+
+    let json2csvParser = new Json2csvParser({ fields })
+    let dataCSV = json2csvParser.parse(results)
+    let csvFileName = `simulations/${population_data}/gen_${generationCount}/results.csv`
+    let poolData = {}
+    selectedStrategies.forEach(function (v) {
+      poolData[v] = pools[v]['pool'].population()
+    })
+
+    let jsonFileName = `simulations/${population_data}/gen_${generationCount}/results.json`
+    let dataJSON = JSON.stringify(poolData, null, 2)
+    if (!noStatSave)
+      saveGenerationData(csvFileName, jsonFileName, dataCSV, dataJSON)
+
+    //Display best of the generation
+    console.log('\n\nGeneration\'s Best Results')
+    let bestOverallResult = []
+    let prefix = './zenbot.sh sim '
+    selectedStrategies.forEach((v) => {
+      let best = results.find(r => r.strategy == v)
+      let bestCommand
+
+      if (best) {
+        console.log(`(${best.strategy}) Sim Fitness ${best.fitness}, VS Buy and Hold: ${z(5, (n(best.vsBuyHold).format('0.0') + '%'), ' ').yellow} BuyAndHold Balance: ${z(5, (n(best.buyHold).format('0.000000')), ' ').yellow}  End Balance: ${z(5, (n(best.endBalance).format('0.000000')), ' ').yellow}, Wins/Losses ${best.wins}/${best.losses}, ROI ${z(5, (n(best.roi).format('0.000000')), ' ').yellow}.`)
+        bestCommand = generateCommandParams(best)
+        bestOverallResult.push(best)
+      } else {
+        console.log(`(${results[0].strategy}) Result Fitness ${results[0].fitness}, VS Buy and Hold: ${z(5, (n(results[0].vsBuyHold).format('0.0') + '%'), ' ').yellow} BuyAndHold Balance: ${z(5, (n(results[0].buyHold).format('0.000000')), ' ').yellow}  End Balance: ${z(5, (n(results[0].endBalance).format('0.000000')), ' ').yellow}, Wins/Losses ${results[0].wins}/${results[0].losses}, ROI ${z(5, (n(results.roi).format('0.000000')), ' ').yellow}.`)
+        bestCommand = generateCommandParams(results[0])
+        bestOverallResult.push(results[0])
+      }
+
+      // prepare command snippet from top result for this strat
+      if (bestCommand != '') {
+        bestCommand = prefix + bestCommand
+        bestCommand = bestCommand + ' --asset_capital=' + argv.asset_capital + ' --currency_capital=' + argv.currency_capital
+        console.log(bestCommand + '\n')
+      }
+    })
+
+    bestOverallResult.sort((a, b) =>
+      (isUndefined(a.fitness)) ? 1 :
+        (isUndefined(b.fitness)) ? 0 :
+          (a.fitness < b.fitness) ? 1 :
+            (b.fitness < a.fitness) ? -1 : 0)
+
+    // let bestOverallCommand = generateCommandParams(bestOverallResult[0])
+    // bestOverallCommand = prefix + bestOverallCommand
+    // bestOverallCommand = bestOverallCommand + ' --asset_capital=' + argv.asset_capital + ' --currency_capital=' + argv.currency_capital
+
+    saveLaunchFiles(generateLaunchFile, bestOverallResult[0])
+
+    if (selectedStrategies.length > 1) {
+      console.log(`(${bestOverallResult[0].strategy}) Best Overall Fitness ${bestOverallResult[0].fitness}, VS Buy and Hold: ${z(5, (n(bestOverallResult[0].vsBuyHold).format('0.00') + '%'), ' ').yellow} BuyAndHold Balance: ${z(5, (n(bestOverallResult[0].buyHold).format('0.000000')), ' ').yellow}  End Balance: ${z(5, (n(bestOverallResult[0].endBalance).format('0.000000')), ' ').yellow}, Wins/Losses ${bestOverallResult[0].wins}/${bestOverallResult[0].losses}, ROI ${z(5, (n(bestOverallResult[0].roi).format('0.000000')), ' ').yellow}.`)
+    }
+
+    selectedStrategies.forEach((v) => {
+      pools[v]['pool'] = pools[v]['pool'].evolve()
+    })
+
+    if (!isUndefined(runGenerations) && runGenerations <= generationCount) {
+      process.exit()
+    }
+
+    generationProcessing = false
   })
-}
-
-let processOutput = (output,taskStrategyName, pheno)=> {
-
-
-  let strippedOutput = StripAnsi(output)
-  let output2 = strippedOutput.substr(strippedOutput.length - 3500)
-
-  let tFileName = path.resolve(__dirname, '..','..', 'simulations','sim_'+taskStrategyName.replace('_','')+'_'+ pheno.exchangeMarketPair.toLowerCase().replace('_','')+'_'+pheno.backtester_generation+'.json')
-  let simulationResults
-
-  let params
-  let endBalance
-  let buyHold
-  let vsBuyHold
-  let wlMatch
-  let errMatch
-  let wins
-  let losses
-  let errorRate
-  let days
-  let start
-  let end
-  // This can retrieve the results from 2 different places.  It defaults to reading it from the json file
-  // but if no file is found it will fall back to the older metheod of scraping the output of the sim process
-  // stdio scraping to be removed after full verification of functionality.
-  // todo: see above comment
-  if (fs.existsSync(tFileName))
-  {
-    let jsonBuffer
-    jsonBuffer = fs.readFileSync(tFileName,{encoding:'utf8'})
-    simulationResults = JSON.parse(jsonBuffer)
-    fs.unlinkSync(tFileName)
-  }
-
-
-  if (typeof(simulationResults) === 'object'  )
-  {
-    params = simulationResults
-    endBalance = simulationResults.simresults.currency
-    buyHold = simulationResults.simresults.buy_hold
-    vsBuyHold = simulationResults.simresults.vs_buy_hold
-    wlMatch = (simulationResults.simresults.total_sells - simulationResults.simresults.total_losses) +'/'+ simulationResults.simresults.total_losses
-    wins          = simulationResults.simresults.total_sells
-    losses        = simulationResults.simresults.total_losses
-    errorRate     = simulationResults.simresults.total_losses / simulationResults.simresults.total_sells
-    days = parseInt(simulationResults.days)
-    start = parseInt(simulationResults.start)
-    end = parseInt(simulationResults.end || null)
-  }
-
-
-  let roi = roundp(((endBalance - params.currency_capital) / params.currency_capital) * 100, 3 )
-
-
-  //todo: figure out what this is trying to do.
-  let r = params
-  delete r.asset_capital
-  delete r.buy_pct
-  delete r.currency_capital
-  delete r.days
-  delete r.mode
-  delete r.order_adjust_time
-  delete r.population
-  delete r.population_data
-  delete r.sell_pct
-  delete r.start
-  delete r.end
-  delete r.stats
-  delete r.use_strategies
-  delete r.verbose
-  delete r.simresults
-  r.selector = r.selector.normalized
-
-  if (start) {
-    r.start = moment(start).format('YYYYMMDDhhmm')
-  }
-  if (end) {
-    r.end = moment(end).format('YYYYMMDDhhmm')
-  }
-  if (!start && !end && params.days) {
-    r.days = params.days
-  }
-
-  let results = {
-    params: 'module.exports = ' + JSON.stringify(r),
-    endBalance: parseFloat(endBalance),
-    buyHold: parseFloat(buyHold),
-    vsBuyHold: parseFloat(vsBuyHold) || vsBuyHold,
-    wins: wins,
-    losses: losses,
-    errorRate: parseFloat(errorRate),
-    days: days,
-    period_length: params.period_length,
-    min_periods: params.min_periods,
-    markdown_buy_pct: params.markdown_buy_pct,
-    markup_sell_pct: params.markup_sell_pct,
-    order_type: params.order_type,
-    roi: roi,
-    wlRatio: losses > 0 ? roundp(wins / losses, 3) : 'Infinity',
-    selector: params.selector,
-    strategy: params.strategy,
-    frequency: roundp((wins + losses) / days, 3)
-  }
-  return results
-}
-
-let Range = (min, max) => {
-  var r = {
-    type: 'int',
-    min: min,
-    max: max
-  }
-  return r
-}
-
-let Range0 = (min, max) => {
-  var r = {
-    type: 'int0',
-    min: min,
-    max: max
-  }
-  return r
-}
-
-let RangeFactor = (min, max, factor) => {
-  var r = {
-    type: 'intfactor',
-    min: min,
-    max: max,
-    factor: factor
-  }
-  return r
-}
-
-
-let RangeFloat = (min, max) => {
-  var r = {
-    type: 'float',
-    min: min,
-    max: max
-  }
-  return r
-}
-
-let RangePeriod = (min, max, period_length) => {
-  var r = {
-    type: 'period_length',
-    min: min,
-    max: max,
-    period_length: period_length
-  }
-  return r
-}
-
-let RangeMakerTaker = () => {
-  var r = {
-    type: 'makertaker'
-  }
-  return r
-}
-
-let RangeNeuralActivation = () => {
-  var r = {
-    type: 'sigmoidtanhrelu'
-  }
-  return r
-}
-let RangeBoolean = () => {
-  var r = {
-    type: 'truefalse'
-  }
-  return r
-}
-
-let strategies = {
-  bollinger: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    bollinger_size: Range(1, 40),
-    bollinger_time: RangeFloat(1,6),
-    bollinger_upper_bound_pct: RangeFloat(-1, 30),
-    bollinger_lower_bound_pct: RangeFloat(-1, 30)
-  },
-  cci_srsi: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    ema_acc: RangeFloat(0, 0.5),
-    cci_periods: Range(1, 200),
-    rsi_periods: Range(1, 200),
-    srsi_periods: Range(1, 200),
-    srsi_k: Range(1, 50),
-    srsi_d: Range(1, 50),
-    oversold_rsi: Range(1, 100),
-    overbought_rsi: Range(1, 100),
-    oversold_cci: Range(-100, 100),
-    overbought_cci: Range(1, 100),
-    constant: RangeFloat(0.001, 0.05)
-  },
-crossover_vwap: {
-    // -- common
-    period_length: RangePeriod(1, 400, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    emalen1: Range(1, 300),
-    smalen1: Range(1, 300),
-    smalen2: Range(1, 300),
-    vwap_length: Range(1, 300),
-    vwap_max: RangeFactor(0, 10000, 10) //0 disables this max cap. Test in increments of 10
-  },
-  dema: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    ema_short_period: Range(1, 20),
-    ema_long_period: Range(20, 100),
-    up_trend_threshold: Range(0, 50),
-    down_trend_threshold: Range(0, 50),
-    overbought_rsi_periods: Range(1, 50),
-    overbought_rsi: Range(20, 100)
-  },
-  macd: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    ema_short_period: Range(1, 20),
-    ema_long_period: Range(20, 100),
-    signal_period: Range(1, 20),
-    up_trend_threshold: Range(0, 50),
-    down_trend_threshold: Range(0, 50),
-    overbought_rsi_periods: Range(1, 50),
-    overbought_rsi: Range(20, 100)
-  },
-  momentum: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 2500),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    momentum_size: Range(1,20)
-  },
-  neural: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    neurons_1: Range(1, 200),
-    activation_1_type: RangeNeuralActivation(),
-    depth: Range(1, 100),
-    min_predict: Range(1, 100),
-    momentum: Range(0, 100),
-    decay: Range(1, 10),
-    learns: Range(1, 200)
-  },
-  rsi: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    rsi_periods: Range(1, 200),
-    oversold_rsi: Range(1, 100),
-    overbought_rsi: Range(1, 100),
-    rsi_recover: Range(1, 100),
-    rsi_drop: Range(0, 100),
-    rsi_divisor: Range(1, 10)
-  },
-  sar: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(2, 100),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    sar_af: RangeFloat(0.01, 1.0),
-    sar_max_af: RangeFloat(0.01, 1.0)
-  },
-  speed: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 100),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    baseline_periods: Range(1, 5000),
-    trigger_factor: RangeFloat(0.1, 10)
-  },
-  srsi_macd: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    rsi_periods: Range(1, 200),
-    srsi_periods: Range(1, 200),
-    srsi_k: Range(1, 50),
-    srsi_d: Range(1, 50),
-    oversold_rsi: Range(1, 100),
-    overbought_rsi: Range(1, 100),
-    ema_short_period: Range(1, 20),
-    ema_long_period: Range(20, 100),
-    signal_period: Range(1, 20),
-    up_trend_threshold: Range(0, 20),
-    down_trend_threshold: Range(0, 20)
-  },
-  stddev: {
-    // -- common
-    // reference in extensions is given in ms have not heard of an exchange that supports 500ms thru api so setting min at 1 second
-    period_length: RangePeriod(1, 7200, 's'),
-    min_periods: Range(1, 2500),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    trendtrades_1: Range(2, 20),
-    trendtrades_2: Range(4, 100)
-  },
-  ta_ema: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 100),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    trend_ema: Range(TREND_EMA_MIN, TREND_EMA_MAX),
-    oversold_rsi_periods: Range(OVERSOLD_RSI_PERIODS_MIN, OVERSOLD_RSI_PERIODS_MAX),
-    oversold_rsi: Range(OVERSOLD_RSI_MIN, OVERSOLD_RSI_MAX)
-  },
-  ta_macd: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    // have to be minimum 2 because talib will throw an "TA_BAD_PARAM" error
-    ema_short_period: Range(2, 20),
-    ema_long_period: Range(20, 100),
-    signal_period: Range(1, 20),
-    up_trend_threshold: Range(0, 50),
-    down_trend_threshold: Range(0, 50),
-    overbought_rsi_periods: Range(1, 50),
-    overbought_rsi: Range(20, 100)
-  },
-  trend_bollinger: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    bollinger_size: Range(1, 40),
-    bollinger_time: RangeFloat(1,6),
-    bollinger_upper_bound_pct: RangeFloat(-1, 30),
-    bollinger_lower_bound_pct: RangeFloat(-1, 30)
-  },
-  trend_ema: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 100),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    trend_ema: Range(TREND_EMA_MIN, TREND_EMA_MAX),
-    oversold_rsi_periods: Range(OVERSOLD_RSI_PERIODS_MIN, OVERSOLD_RSI_PERIODS_MAX),
-    oversold_rsi: Range(OVERSOLD_RSI_MIN, OVERSOLD_RSI_MAX)
-  },
-  trendline: {
-    // -- common
-    period_length: RangePeriod(1, 400, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    lastpoints: Range(20, 500),
-    avgpoints: Range(300, 3000),
-    lastpoints2: Range(5, 300),
-    avgpoints2: Range(50, 1000),
-  },
-  trust_distrust: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 100),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    sell_threshold: Range(1, 100),
-    sell_threshold_max: Range0(1, 100),
-    sell_min: Range(1, 100),
-    buy_threshold: Range(1, 100),
-    buy_threshold_max: Range0(1, 100),
-    greed: Range(1, 100)
-  },
-  wavetrend: {
-    // -- common
-    period_length: RangePeriod(1, 120, 'm'),
-    min_periods: Range(1, 200),
-    markdown_buy_pct: RangeFloat(-1, 5),
-    markup_sell_pct: RangeFloat(-1, 5),
-    order_type: RangeMakerTaker(),
-    sell_stop_pct: Range0(1, 50),
-    buy_stop_pct: Range0(1, 50),
-    profit_stop_enable_pct: Range0(1, 20),
-    profit_stop_pct: Range(1,20),
-
-    // -- strategy
-    wavetrend_channel_length: Range(1,20),
-    wavetrend_average_length: Range(1,42),
-    wavetrend_overbought_1: Range(1, 100),
-    wavetrend_overbought_2: Range(1,100),
-    wavetrend_oversold_1: Range(-100,0),
-    wavetrend_oversold_2: Range(-100,0),
-    wavetrend_trends: RangeBoolean()
-  }
-}
-
-let allStrategyNames = () => {
-  let r = []
-  for (var k in strategies) {
-    r.push(k)
-  }
-  return r
 }
 
 console.log(`\n--==${VERSION}==--`)
 console.log(new Date().toUTCString() + '\n')
 
-let argv = require('yargs').argv
-let simArgs = Object.assign({}, argv)
-if (!simArgs.selector)
+simArgs = Object.assign({}, argv)
+if (!simArgs.selector) {
   simArgs.selector = 'bitfinex.ETH-USD'
-if (!simArgs.filename)
+}
+
+if (!simArgs.filename) {
   simArgs.filename = 'none'
+}
+
+if (simArgs.help || !(simArgs.use_strategies)) {
+  console.log('--use_strategies=<stragegy_name>,<stragegy_name>,<stragegy_name>   Min one strategy, can include more than one')
+  console.log('--population_data=<filename>    filename used for continueing backtesting from previous run')
+  console.log('--generateLaunch=<true>|<false>        will generate .sh and .bat file using the best generation discovered')
+  console.log('--population=<int>    populate per strategy')
+  console.log('--maxCores=<int>    maximum processes to execute at a time default is # of cpu cores in system')
+  console.log('--selector=<exchange.marketPair>  ')
+  console.log('--asset_capital=<float>    amount coin to start sim with ')
+  console.log('--currency_capital=<float>  amount of capital/base currency to start sim with')
+  console.log('--days=<int>  amount of days to use when backfilling')
+  console.log('--noStatSave=<true>|<false>')
+  console.log('--runGenerations=<int>  if used run this number of generations, will be shown 1 less due to generations starts at 0')
+  console.log('--minTrades=<int>  Minimum wins before generation is considured fit to evolve')
+  console.log('--fitnessCalcType=<wl / profit / classic / profitwl> Default: Classic.')
+  console.log('                  wl will score the highes for wins and losses, profit does not care about wins and losses only the higest end balance,')
+  console.log('                  classic uses original claculation / profitwl tries to get the highest profit using the lowest win/loss ratio')
+  process.exit(0)
+}
+
 delete simArgs.use_strategies
 delete simArgs.population_data
 delete simArgs.population
 delete simArgs['$0'] // This comes in to argv all by itself
 delete simArgs['_']  // This comes in to argv all by itself
 
-let strategyName = (argv.use_strategies) ? argv.use_strategies : 'all'
-let populationFileName = (argv.population_data) ? argv.population_data : null
-let populationSize = (argv.population) ? argv.population : 100
+if (simArgs.maxCores) {
+  if (simArgs.maxCores < 1) PARALLEL_LIMIT = 1
+  else PARALLEL_LIMIT = simArgs.maxCores
+}
+fitnessCalcType = 'classic'
+if (simArgs.fitnessCalcType) {
 
-console.log(`Backtesting strategy ${strategyName} ...`)
+  if (simArgs.fitnessCalcType == 'classic') fitnessCalcType = 'classic'
+  if (simArgs.fitnessCalcType == 'wl') fitnessCalcType = 'wl'
+  if (simArgs.fitnessCalcType == 'profit') fitnessCalcType = 'profit'
+  if (simArgs.fitnessCalcType == 'profitwl') fitnessCalcType = 'profitwl'
+
+
+}
+
+
+if (!isUndefined(simArgs.runGenerations)) {
+  if (simArgs.runGenerations) {
+    runGenerations = simArgs.runGenerations - 1
+  }
+}
+
+let generateLaunchFile = (simArgs.generateLaunch) ? true : false
+noStatSave = (simArgs.noStatSave) ? true : false
+
+let strategyName = (argv.use_strategies) ? argv.use_strategies : 'all'
+populationSize = (argv.population) ? argv.population : 100
+minimumTrades = (argv.minTrades) ? argv.minTrades : 0
+//floatScanWindow = (argv.floatScanWindow) ? argv.floatScanWindow : false
+ignoreLaunchFitness = (argv.ignoreLaunchFitness) ? argv.ignoreLaunchFitness : false
+
+population_data = argv.population_data || `backtest.${simArgs.selector.toLowerCase()}.${moment().format('YYYYMMDDHHmmss')}`
+
+console.log(`Backtesting strategy ${strategyName} ...\n`)
 console.log(`Creating population of ${populationSize} ...\n`)
 
-let pools = {}
-let selectedStrategies = (strategyName === 'all') ? allStrategyNames() : strategyName.split(',')
+selectedStrategies = (strategyName === 'all') ? allStrategyNames() : strategyName.split(',')
 
+Backtester.deLint()
 
-let importedPoolData = (populationFileName) ? JSON.parse(fs.readFileSync(populationFileName, 'utf8')) : null
-
-//Clean up any generation files left over in the simulation directory
-//they will be overwritten, but best not to confuse the issue.
-//if it fails.   doesn't matter they will be overwritten anyways. not need to halt the system.
-try
-{
-  let tDirName = path.resolve(__dirname, '..','..', 'simulations')
-  let tFileName = 'sim_'
-  let files = fs.readdirSync(tDirName)
-
-  for(let i = 0; i < files.length; i++)
-  {
-    if (files[i].lastIndexOf(tFileName) == 0)
-    {
-      let filePath = path.resolve(__dirname, '..','..', 'simulations',files[i] )
-      fs.unlinkSync(filePath)
-    }
-
-  }
-} catch (err)
-{
-  console.log('error deleting lint from prior run')
-}
-
-selectedStrategies.forEach(function(v) {
+for (var i = 0; i < selectedStrategies.length; i++) {
+  let v = selectedStrategies[i]
   let strategyPool = pools[v] = {}
+  let strategyData = require(path.resolve(__dirname, `../../extensions/strategies/${v}/strategy`))
+  let strategyPhenotypes = strategyData.phenotypes
 
-  let evolve = true
-  let population = (importedPoolData && importedPoolData[v]) ? importedPoolData[v] : []
-  for (var i = population.length; i < populationSize; ++i) {
-    population.push(Phenotypes.create(strategies[v]))
-    evolve = false
-  }
+  if (strategyPhenotypes) {
+    let evolve = true
+    let population = []
 
-  strategyPool['config'] = {
-    mutationFunction: function(phenotype) {
-      return Phenotypes.mutation(phenotype, strategies[v])
-    },
-    crossoverFunction: function(phenotypeA, phenotypeB) {
-      return Phenotypes.crossover(phenotypeA, phenotypeB, strategies[v])
-    },
-    fitnessFunction: Phenotypes.fitness,
-    doesABeatBFunction: Phenotypes.competition,
-    population: population,
-    populationSize: populationSize
-  }
-
-  strategyPool['pool'] = GeneticAlgorithmCtor(strategyPool.config)
-  if (evolve) {
-    strategyPool['pool'].evolve()
-  }
-})
-
-var isUsefulKey = key => {
-  if(key == 'filename' || key == 'show_options' || key == 'sim') return false
-  return true
-}
-var generateCommandParams = input => {
-  input = input.params.replace('module.exports =','')
-  input = JSON.parse(input)
-
-  var result = ''
-  var keys = Object.keys(input)
-  for(let i = 0;i < keys.length;i++){
-    var key = keys[i]
-    if(isUsefulKey(key)){
-      // selector should be at start before keys
-      if(key == 'selector'){
-        result = input[key] + result
-      }
-
-      else result += ' --'+key+'='+input[key]
+    for (var i2 = population.length; i2 < populationSize; ++i2) {
+      var lPheno = Phenotypes.create(strategyPhenotypes)
+      population.push(lPheno)
+      evolve = false
     }
 
+    strategyPool['config'] = {
+      mutationFunction: function (phenotype) {
+        return Phenotypes.mutation(phenotype, strategyPhenotypes)
+      },
+      crossoverFunction: function (phenotypeA, phenotypeB) {
+        return Phenotypes.crossover(phenotypeA, phenotypeB, strategyPhenotypes)
+      },
+      fitnessFunction: Phenotypes.fitness,
+      doesABeatBFunction: Phenotypes.competition,
+      population: population,
+      populationSize: populationSize
+    }
+
+    strategyPool['pool'] = GeneticAlgorithmCtor(strategyPool.config)
+
+    if (evolve) {
+      strategyPool['pool'].evolve()
+    }
   }
-  return result
-}
-var saveGenerationData = function(csvFileName, jsonFileName, dataCSV, dataJSON, callback){
-  fs.writeFile(csvFileName, dataCSV, err => {
-    if (err) throw err
-    console.log('> Finished writing generation csv to ' + csvFileName)
-    callback(1)
-  })
-  fs.writeFile(jsonFileName, dataJSON, err => {
-    if (err) throw err
-    console.log('> Finished writing generation json to ' + jsonFileName)
-    callback(2)
-  })
-}
-let generationCount = 0
-
-let simulateGeneration = () => {
-  console.log(`\n\n=== Simulating generation ${++generationCount} ===\n`)
-
-  let days = argv.days
-  if (!days) {
-    if (argv.start) {
-      var start = moment(argv.start, 'YYYYMMDDhhmm')
-      days = Math.max(1, moment().diff(start, 'days'))
+  else {
+    if (strategyName === 'all') {
+      // skip it
+      selectedStrategies.splice(i, 1)
+      i--
     }
     else {
-      var end = moment(argv.end, 'YYYYMMDDhhmm')
-      days = moment().diff(end, 'days') + 1
+      console.log(`No phenotypes definition found for strategy ${v}`)
+      process.exit(1)
     }
   }
-  runUpdate(days, argv.selector)
+}
 
-  iterationCount = 1
-  let tasks = selectedStrategies.map(v => pools[v]['pool'].population().map(phenotype => {
-    return cb => {
-      phenotype.backtester_generation = iterationCount
-      phenotype.exchangeMarketPair = argv.selector
-      runCommand(v, phenotype, cb)
-    }
-  })).reduce((a, b) => a.concat(b))
+// BEGIN - exitHandler
+var exitHandler = function (options, exitErr) {
+  if (generationCount && options.cleanup && (isUndefined(runGenerations) || runGenerations !== generationCount)) {
+    console.log('Resume this backtest later with:')
+    var darwin_args = process.argv.slice(2, process.argv.length)
 
-  parallel(tasks, PARALLEL_LIMIT, (err, results) => {
-    console.log('\nGeneration complete, saving results...')
-    results = results.filter(function(r) {
-      return !!r
-    })
-
-    results.sort((a, b) => (a.fitness < b.fitness) ? 1 : ((b.fitness < a.fitness) ? -1 : 0))
-
-    let fieldsGeneral = ['selector.normalized', 'fitness', 'vsBuyHold', 'wlRatio', 'frequency', 'strategy', 'order_type', 'endBalance', 'buyHold', 'wins', 'losses', 'period_length', 'min_periods', 'days', 'params']
-    let fieldNamesGeneral = ['Selector', 'Fitness', 'VS Buy Hold (%)', 'Win/Loss Ratio', '# Trades/Day', 'Strategy', 'Order Type', 'Ending Balance ($)', 'Buy Hold ($)', '# Wins', '# Losses', 'Period', 'Min Periods', '# Days', 'Full Parameters']
-
-    let dataCSV = json2csv({
-      data: results,
-      fields: fieldsGeneral,
-      fieldNames: fieldNamesGeneral
-    })
-
-    let fileDate = Math.round(+new Date() / 1000)
-    let csvFileName = `simulations/backtesting_${fileDate}.csv`
-
-    let poolData = {}
-    selectedStrategies.forEach(function(v) {
-      poolData[v] = pools[v]['pool'].population()
-    })
-
-    let jsonFileName = `simulations/generation_data_${fileDate}_gen_${generationCount}.json`
-    let dataJSON = JSON.stringify(poolData, null, 2)
-    var filesSaved = 0
-    saveGenerationData(csvFileName, jsonFileName, dataCSV, dataJSON, (id)=>{
-      filesSaved++
-      if(filesSaved == 2){
-        console.log('\n\nGeneration\'s Best Results')
-        selectedStrategies.forEach((v)=> {
-          let best = pools[v]['pool'].best()
-
-          if(best.sim){
-            console.log(`\t(${v}) Sim Fitness ${best.sim.fitness}, VS Buy and Hold: ${best.sim.vsBuyHold} End Balance: ${best.sim.endBalance}, Wins/Losses ${best.sim.wins}/${best.sim.losses}.`)
-
-          } else {
-            console.log(`\t(${v}) Result Fitness ${results[0].fitness}, VS Buy and Hold: ${results[0].vsBuyHold}, End Balance: ${results[0].endBalance}, Wins/Losses ${results[0].wins}/${results[0].losses}.`)
-          }
-
-          // prepare command snippet from top result for this strat
-          let prefix = './zenbot.sh sim '
-          let bestCommand = generateCommandParams(results[0])
-
-          bestCommand = prefix + bestCommand
-          bestCommand = bestCommand + ' --asset_capital=' + argv.asset_capital + ' --currency_capital=' + argv.currency_capital
-
-          console.log(bestCommand + '\n')
-
-          let nextGen = pools[v]['pool'].evolve()
-        })
-
-        simulateGeneration()
+    var hasPopData = false
+    var popDataArg = `--population_data=${population_data}`
+    darwin_args.forEach(function (arg) {
+      if (arg === popDataArg) {
+        hasPopData = true
       }
     })
 
-  })
+    if (!hasPopData) {
+      darwin_args.push(popDataArg)
+    }
+
+    console.log(`./scripts/genetic_backtester/darwin.js ${darwin_args.join(' ')}`)
+  }
+
+  if (exitErr) console.log(exitErr.stack || exitErr)
+  if (options.exit) process.exit()
 }
 
-simulateGeneration()
+process.on('exit', exitHandler.bind(null, { cleanup: true }))
+
+//catches ctrl+c event
+process.on('SIGINT', exitHandler.bind(null, { exit: true }))
+
+// catches "kill pid" (for example: nodemon restart)
+process.on('SIGUSR1', exitHandler.bind(null, { exit: true }))
+process.on('SIGUSR2', exitHandler.bind(null, { exit: true }))
+
+//catches uncaught exceptions
+process.on('uncaughtException', exitHandler.bind(null, { exit: true }))
+// END - exitHandler
+
+Backtester.init({
+  simArgs: simArgs,
+  simTotalCount: populationSize * selectedStrategies.length,
+  parallelLimit: PARALLEL_LIMIT,
+  writeFile: writeSimDataFile
+})
+setInterval(() => {
+  if (generationProcessing == false) simulateGeneration(generateLaunchFile)
+}, 1000)

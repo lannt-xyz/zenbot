@@ -4,16 +4,24 @@ let ccxt = require('ccxt')
 new ccxt.binance().fetch_markets().then(function(markets) {
   var products = []
 
-  markets.forEach(function (market) {
-    products.push({
+  var products = markets.map(function (market) {
+    const filters = market.info.filters
+    const price_filter = filters.find(f => f.filterType === 'PRICE_FILTER')
+    const lot_size_filter = filters.find(f => f.filterType === 'LOT_SIZE')
+    const notional_filter = filters.find(f => f.filterType === 'MIN_NOTIONAL')
+
+    // NOTE: price_filter also contains minPrice and maxPrice
+    return {
       id: market.id,
       asset: market.base,
       currency: market.quote,
-      min_size: market.info.filters[1].minQty,
-      max_size: market.info.filters[0].maxPrice,
-      increment: market.info.filters[1].stepSize,
+      min_size: lot_size_filter.minQty,
+      max_size: lot_size_filter.maxQty,
+      min_total: notional_filter.minNotional,
+      increment: price_filter.tickSize,
+      asset_increment: lot_size_filter.stepSize,
       label: market.base + '/' + market.quote
-    })
+    }
   })
 
   var target = require('path').resolve(__dirname, 'products.json')
