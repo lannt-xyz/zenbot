@@ -58,10 +58,10 @@ module.exports = function api () {
     mainApp.use(context, app)
     if (ip && ip !== '0.0.0.0') {
       mainApp.listen(port, ip)
-      tradeObject.url = ip + ':' + port + '/'
+      tradeObject.url = ip + ':' + port + '/' + context
     } else {
       mainApp.listen(port)
-      tradeObject.url = require('ip').address() + ':' + port + '/'
+      tradeObject.url = require('ip').address() + ':' + port + '/' + context
     }
     console.log('Web GUI running on http://' + tradeObject.url)
   }
