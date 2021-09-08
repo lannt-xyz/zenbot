@@ -8,10 +8,10 @@ module.exports = function api () {
   let run = function(reporter, tradeObject) {
     if (!reporter.port || reporter.port === 0) {
       random_port({from: 20000}, function(port) {
-        startServer(port, reporter.ip, tradeObject)
+        startServer(port, reporter.ip, reporter.context, tradeObject)
       })
     } else {
-      startServer(reporter.port, reporter.ip, tradeObject)
+      startServer(reporter.port, reporter.ip, reporter.context, tradeObject)
     }
   }
 
@@ -28,7 +28,7 @@ module.exports = function api () {
     max: 50
   });
 
-  let startServer = function(port, ip, tradeObject) {
+  let startServer = function(port, ip, context, tradeObject) {
     tradeObject.port = port
 
     app.set('views', path.join(__dirname+'/../../templates'))
@@ -54,11 +54,13 @@ module.exports = function api () {
       res.sendFile(path.join(__dirname+'../../../stats/index.html'))
     })
 
+    let mainApp = express()
+    mainApp.use(context, app)
     if (ip && ip !== '0.0.0.0') {
-      app.listen(port, ip)
+      mainApp.listen(port, ip)
       tradeObject.url = ip + ':' + port + '/'
     } else {
-      app.listen(port)
+      mainApp.listen(port)
       tradeObject.url = require('ip').address() + ':' + port + '/'
     }
     console.log('Web GUI running on http://' + tradeObject.url)
