@@ -28,8 +28,9 @@ module.exports = function api () {
     max: 50
   });
 
-  let startServer = function(port, ip, context, tradeObject) {
+  let startServer = function(port, ip, apiContext, tradeObject) {
     tradeObject.port = port
+    tradeObject.context = apiContext
 
     app.set('views', path.join(__dirname+'/../../templates'))
     app.set('view engine', 'ejs')
@@ -43,10 +44,13 @@ module.exports = function api () {
       app.locals.moment = moment
       app.locals.deposit = tradeObject.options.deposit
       let datas = JSON.parse(JSON.stringify(objectWithoutKey(tradeObject, 'options'))) // deep copy to prevent alteration
+      console.log('xxxxxxx')
+      console.log(datas)
+      console.log('xxxxxxx')
       res.render('dashboard', datas)
     })
 
-    app.get(context + '/trades', function (req, res) {
+    app.get('/' + apiContext + '/trades', function (req, res) {
       res.send(objectWithoutKey(tradeObject, 'options'))
     })
 
@@ -56,10 +60,10 @@ module.exports = function api () {
 
     if (ip && ip !== '0.0.0.0') {
       app.listen(port, ip)
-      tradeObject.url = ip + ':' + port + '/' + context
+      tradeObject.url = ip + ':' + port + '- api context' + apiContext
     } else {
       app.listen(port)
-      tradeObject.url = require('ip').address() + ':' + port + '/' + context
+      tradeObject.url = require('ip').address() + ':' + port + '- api context' + apiContext
     }
     console.log('Web GUI running on http://' + tradeObject.url)
   }
