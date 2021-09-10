@@ -46,7 +46,7 @@ module.exports = function api () {
       res.render('dashboard', datas)
     })
 
-    app.get('/trades', function (req, res) {
+    app.get(context + '/trades', function (req, res) {
       res.send(objectWithoutKey(tradeObject, 'options'))
     })
 
@@ -54,13 +54,11 @@ module.exports = function api () {
       res.sendFile(path.join(__dirname+'../../../stats/index.html'))
     })
 
-    let mainApp = express()
-    mainApp.use(context, app)
     if (ip && ip !== '0.0.0.0') {
-      mainApp.listen(port, ip)
+      app.listen(port, ip)
       tradeObject.url = ip + ':' + port + '/' + context
     } else {
-      mainApp.listen(port)
+      app.listen(port)
       tradeObject.url = require('ip').address() + ':' + port + '/' + context
     }
     console.log('Web GUI running on http://' + tradeObject.url)
