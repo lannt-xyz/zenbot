@@ -173,6 +173,7 @@
                 <div class="col-md-12 col-lg-12 col-sm-12 col-12">
                     <div class="white-box">
                         <h3 class="box-title"><%= exchange.name.toUpperCase() %> <%= asset.toUpperCase() %>/<%= currency.toUpperCase() %> Trade chart</h3>
+                        <h3 id="context_path" style="display: none;"><%= context %></h3>
                         <div id="trade_chart" style="height: 505px;">
                         </div>
                         <script src="assets-wp/echarts.bundle.js" charset="utf8"></script>
@@ -185,7 +186,9 @@
                             }
 
                             var xmlhttp = new XMLHttpRequest();
-                            xmlhttp.open("GET", "trades", true);
+                            var contextPath = $("#context_path").text();
+                            var tradesPath = contextPath && contextPath != "" ? contextPath + "/trades" : "trades";
+                            xmlhttp.open("GET", tradesPath, true);
                             xmlhttp.onreadystatechange = function() {
                                 if (this.readyState == 4 && this.status == 200) {
                                     var tradeData = JSON.parse(this.responseText);
