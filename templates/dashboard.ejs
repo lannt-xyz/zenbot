@@ -186,7 +186,7 @@
                             }
 
                             var xmlhttp = new XMLHttpRequest();
-                            var contextPath = $("#context_path").text();
+                            var contextPath = document.getElementById("#context_path").text();
                             var tradesPath = contextPath && contextPath != "" ? contextPath + "/trades" : "trades";
                             console.log("xxxxxx")
                             console.log(tradesPath)
