@@ -4,6 +4,7 @@ module.exports = function api () {
   let random_port = require('random-port')
   let path = require('path')
   let moment = require('moment')
+  const router = express.Router()
 
   let run = function(reporter, tradeObject) {
     if (!reporter.port || reporter.port === 0) {
@@ -40,23 +41,22 @@ module.exports = function api () {
     app.use('/assets-wp', express.static(__dirname+'/../../dist/'))
     app.use('/assets-zenbot', express.static(__dirname+'/../../assets'))
 
-    app.get('/', function (req, res) {
+    router.get('/', function (req, res) {
       app.locals.moment = moment
       app.locals.deposit = tradeObject.options.deposit
       let datas = JSON.parse(JSON.stringify(objectWithoutKey(tradeObject, 'options'))) // deep copy to prevent alteration
-      console.log('xxxxxxx')
-      console.log(datas)
-      console.log('xxxxxxx')
       res.render('dashboard', datas)
     })
 
-    app.get('/' + apiContext + '/trades', function (req, res) {
+    router.get('/trades', function (req, res) {
       res.send(objectWithoutKey(tradeObject, 'options'))
     })
 
-    app.get('/stats', function (req, res) {
+    router.get('/stats', function (req, res) {
       res.sendFile(path.join(__dirname+'../../../stats/index.html'))
     })
+
+    app.use('/' + apiContext, router)
 
     if (ip && ip !== '0.0.0.0') {
       app.listen(port, ip)

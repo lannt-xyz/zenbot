@@ -189,9 +189,6 @@
                             var contextTag = document.getElementById("context_path");
                             var contextPath = contextTag.innerText;
                             var tradesPath = contextPath && contextPath != "" ? contextPath + "/trades" : "trades";
-                            console.log("xxxxxx")
-                            console.log(tradesPath)
-                            console.log("xxxxxx")
                             xmlhttp.open("GET", tradesPath, true);
                             xmlhttp.onreadystatechange = function() {
                                 if (this.readyState == 4 && this.status == 200) {
