@@ -4,14 +4,15 @@ module.exports = function api () {
   let random_port = require('random-port')
   let path = require('path')
   let moment = require('moment')
+  const router = express.Router()
 
   let run = function(reporter, tradeObject) {
     if (!reporter.port || reporter.port === 0) {
       random_port({from: 20000}, function(port) {
-        startServer(port, reporter.ip, tradeObject)
+        startServer(port, reporter.ip, reporter.context, tradeObject)
       })
     } else {
-      startServer(reporter.port, reporter.ip, tradeObject)
+      startServer(reporter.port, reporter.ip, reporter.context, tradeObject)
     }
   }
 
@@ -28,8 +29,9 @@ module.exports = function api () {
     max: 50
   });
 
-  let startServer = function(port, ip, tradeObject) {
+  let startServer = function(port, ip, apiContext, tradeObject) {
     tradeObject.port = port
+    tradeObject.context = apiContext
 
     app.set('views', path.join(__dirname+'/../../templates'))
     app.set('view engine', 'ejs')
@@ -39,27 +41,29 @@ module.exports = function api () {
     app.use('/assets-wp', express.static(__dirname+'/../../dist/'))
     app.use('/assets-zenbot', express.static(__dirname+'/../../assets'))
 
-    app.get('/', function (req, res) {
+    router.get('/', function (req, res) {
       app.locals.moment = moment
       app.locals.deposit = tradeObject.options.deposit
       let datas = JSON.parse(JSON.stringify(objectWithoutKey(tradeObject, 'options'))) // deep copy to prevent alteration
       res.render('dashboard', datas)
     })
 
-    app.get('/trades', function (req, res) {
+    router.get('/trades', function (req, res) {
       res.send(objectWithoutKey(tradeObject, 'options'))
     })
 
-    app.get('/stats', function (req, res) {
+    router.get('/stats', function (req, res) {
       res.sendFile(path.join(__dirname+'../../../stats/index.html'))
     })
 
+    app.use('/' + apiContext, router)
+
     if (ip && ip !== '0.0.0.0') {
       app.listen(port, ip)
-      tradeObject.url = ip + ':' + port + '/'
+      tradeObject.url = ip + ':' + port + '- api context' + apiContext
     } else {
       app.listen(port)
-      tradeObject.url = require('ip').address() + ':' + port + '/'
+      tradeObject.url = require('ip').address() + ':' + port + '- api context' + apiContext
     }
     console.log('Web GUI running on http://' + tradeObject.url)
   }

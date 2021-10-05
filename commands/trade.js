@@ -521,9 +521,6 @@ module.exports = function (program, conf) {
               console.log('-'.repeat(minuses) + ' STARTING ' + so.mode.toUpperCase() + ' TRADING ' + '-'.repeat(minuses + (minuses % 2 == 0 ? 0 : 1)))
               if (so.mode === 'paper') {
                 console.log('!!! Paper mode enabled. No real trades are performed until you remove --paper from the startup command.')
-                console.log('---------------')
-                console.log(so)
-                console.log('---------------')
               }
               console.log('Press ' + ' l '.inverse + ' to list available commands.')
               engine.syncBalance(function (err) {
