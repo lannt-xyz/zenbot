@@ -56,6 +56,13 @@ module.exports = function api () {
       res.sendFile(path.join(__dirname+'../../../stats/index.html'))
     })
 
+    router.get('/summary', function (req, res) {
+      app.locals.moment = moment
+      app.locals.deposit = tradeObject.options.deposit
+      let datas = JSON.parse(JSON.stringify(objectWithoutKey(tradeObject, 'options')))
+      res.render('summary', datas)
+    })
+
     app.use('/' + apiContext, router)
 
     if (ip && ip !== '0.0.0.0') {

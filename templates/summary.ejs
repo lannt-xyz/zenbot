@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets-zenbot/zenbot_square.png">
+
+    <link rel="manifest" href="/assets/manifest.json">
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ff6600">
+    <meta name="msapplication-navbutton-color" content="#ff6600">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="msapplication-starturl" content="/">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="icon" type="image/png" sizes="330x203" href="/assets-zenbot/logo.png">
+    <link rel="apple-touch-icon" type="image/png" sizes="330x203" href="/assets-zenbot/logo.png">
+
+    <title><%= asset.toUpperCase() %>/<%= currency.toUpperCase() %> on <%= exchange.name.toUpperCase() %> - Dashboard</title>
+    <!-- Webpack compiled -->
+    <link href="/assets-wp/app.bundle.css" rel="stylesheet">
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head>
+
+<body class="hide-sidebar" >
+    <div class="row">
+        <% if (typeof stats != "undefined") { %>
+        <div class="col-lg-3 col-sm-6 col-12">
+            <div class="white-box analytics-info">
+                <h3 class="box-title">Last balance (<%= new Intl.NumberFormat("en-US", {style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2}).format((parseFloat(stats.profit)/100)-(parseFloat(stats.buy_hold_profit)/100) ) %> vs buy hold)</h3>
+                <ul class="list-inline one-part">
+                    <li class="text-right text-success"><i class="ti-arrow-up"></i> <span class="counter"><%= new Intl.NumberFormat("en-US", {useGrouping: false, minimumFractionDigits: 8, maximumFractionDigits: 8}).format(stats.tmp_balance) %></span> <small><%= currency.toUpperCase() %></small></li>
+                    <li class="text-right text-<% if (parseFloat(stats.profit) < 0) { %>danger<% } else { %>success<% } %>""><i class="ti-arrow-up"></i> <span><%= stats.profit %></span> <small>of profit</small></li>
+                </ul>
+            </div>
+        </div>
+        <% } %>
+    </div>
+</body>
+
+</html>
