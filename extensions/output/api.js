@@ -63,14 +63,20 @@ module.exports = function api () {
       res.render('summary', datas)
     })
 
+    router.get('/signal', function(req, res) {
+      tradeObject.apiSignal = req.query.action
+      res.status(200)
+      res.send('')
+    })
+
     app.use('/' + apiContext, router)
 
     if (ip && ip !== '0.0.0.0') {
       app.listen(port, ip)
-      tradeObject.url = ip + ':' + port + '- api context' + apiContext
+      tradeObject.url = ip + ':' + port + '- api context: ' + apiContext
     } else {
       app.listen(port)
-      tradeObject.url = require('ip').address() + ':' + port + '- api context' + apiContext
+      tradeObject.url = require('ip').address() + ':' + port + '- api context: ' + apiContext
     }
     console.log('Web GUI running on http://' + tradeObject.url)
   }
