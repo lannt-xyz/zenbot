@@ -121,7 +121,7 @@ c.output.api.port = process.env.ZENBOT_API_PORT || 17365
 c.output.api.context = process.env.ZENBOT_API_CONTEXT || ''
 
 c.emailSignal = {}
-c.emailSignal.username = process.env.ZENBOT_MAIL_SIGNAL_USERNAME || 'lanntxyz.tradingview@gmail.com'
-c.emailSignal.password = process.env.ZENBOT_MAIL_SIGNAL_PASSWORD || 'iyyjgattptnqojkf'
-c.emailSignal.host = process.env.ZENBOT_MAIL_SIGNAL_HOST || 'imap.gmail.com'
+c.emailSignal.username = process.env.ZENBOT_MAIL_SIGNAL_USERNAME || ''
+c.emailSignal.password = process.env.ZENBOT_MAIL_SIGNAL_PASSWORD || ''
+c.emailSignal.host = process.env.ZENBOT_MAIL_SIGNAL_HOST || 'imap.gmail.com' // gmail imap server
 c.emailSignal.port = process.env.ZENBOT_MAIL_SIGNAL_PORT || 993
