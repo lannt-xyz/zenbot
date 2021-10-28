@@ -10,6 +10,7 @@ module.exports = {
     this.option('period', 'period length, same as --period_length', String, '1s')
     this.option('period_length', 'period length, same as --period', String, '1s')
 
+    this.option('no_backfill', 'disable backfill', Boolean, true)
   },
 
   calculate: function (s) {
@@ -49,7 +50,7 @@ module.exports = {
     profit_stop_pct: Phenotypes.Range(1,20),
 
     // -- strategy
-    
+    no_backfill: Phenotypes.ListOption([true, false]),
   }
 }
 

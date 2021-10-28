@@ -92,7 +92,7 @@ module.exports = {
     this.option('period', 'period length, same as --period_length', String, '1s')
     this.option('period_length', 'period length, same as --period', String, '1s')
 
-    this.option('no_backfill', 'disable backfill', String, 'true')
+    this.option('no_backfill', 'disable backfill', Boolean, true)
   },
 
   calculate: function (s) {
