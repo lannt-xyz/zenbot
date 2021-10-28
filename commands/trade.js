@@ -468,10 +468,17 @@ module.exports = function (program, conf) {
 
       console.log('fetching pre-roll data:')
       var zenbot_cmd = process.platform === 'win32' ? 'zenbot.bat' : 'zenbot.sh' // Use 'win32' for 64 bit windows too
-      var command_args = ['backfill', so.selector.normalized, '--days', days || 1]
+      // Disable backfill based on conf
+      var backfillDays = days || 1
+      if (so.no_backfill) {
+        console.log('canceling backfill')
+        backfillDays = 0;
+      }
+      var command_args = ['backfill', so.selector.normalized, '--days', backfillDays]
       if (cmd.conf) {
         command_args.push('--conf', cmd.conf)
       }
+      console.log(zenbot_cmd, command_args)
       var backfiller = spawn(path.resolve(__dirname, '..', zenbot_cmd), command_args)
       backfiller.stdout.pipe(process.stdout)
       backfiller.stderr.pipe(process.stderr)

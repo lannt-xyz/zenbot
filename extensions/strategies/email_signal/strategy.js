@@ -32,7 +32,7 @@ function initImap(mailSignalOptions) {
           if (err) throw err;
           var searchConditions = [
             'UNSEEN',
-            ['SUBJECT', 'lanntxyz@tradingview: ']
+            ['SUBJECT', 'notifier@tradingview: ']
           ];
           imap.esearch(searchConditions, ['MAX'], function (err, results) {
             if (err) throw err;
@@ -92,6 +92,7 @@ module.exports = {
     this.option('period', 'period length, same as --period_length', String, '1s')
     this.option('period_length', 'period length, same as --period', String, '1s')
 
+    this.option('no_backfill', 'disable backfill', String, 'true')
   },
 
   calculate: function (s) {
@@ -135,7 +136,7 @@ module.exports = {
     profit_stop_pct: Phenotypes.Range(1, 20),
 
     // -- strategy
-
+    no_backfill: Phenotypes.ListOption([true, false]),
   }
 }
 
