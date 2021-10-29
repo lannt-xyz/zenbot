@@ -4,6 +4,7 @@ var z = require('zero-fill')
   , conf = require('../../../conf')
   , emailSignal = null
   , imapListener = null
+  , tradingTicker = null;
 
 function initImap(mailSignalOptions) {
   var imap = new Imap({
@@ -16,9 +17,10 @@ function initImap(mailSignalOptions) {
       rejectUnauthorized: false
     }
   });
+  var subjectPrefix = mailSignalOptions.subjectPrefix || 'notifier@tradingview: '
 
   function openInbox(cb) {
-    imap.openBox('INBOX', true, cb);
+    imap.openBox('INBOX', false, cb);
   }
 
   imap.once('ready', function () {
@@ -28,11 +30,12 @@ function initImap(mailSignalOptions) {
       imap.on('mail', function (mail) {
         console.log('')
         console.log(mail, ' new email comming')
+
         imap.openBox('INBOX', true, function (err, box) {
           if (err) throw err;
           var searchConditions = [
             'UNSEEN',
-            ['SUBJECT', 'notifier@tradingview: ']
+            ['SUBJECT', subjectPrefix]
           ];
           imap.esearch(searchConditions, ['MAX'], function (err, results) {
             if (err) throw err;
@@ -56,12 +59,8 @@ function initImap(mailSignalOptions) {
                 });
                 stream.once('end', function () {
                   var mailHeader = Imap.parseHeader(buffer);
-                  var title = mailHeader['subject'][0];
-                  if (title.includes('sell')) {
-                    emailSignal = 'sell'
-                  } else if (title.includes('buy')) {
-                    emailSignal = 'buy'
-                  }
+                  emailSignal = mailHeader['subject'][0];
+                  console.log('Email subject recieved: ', emailSignal)
                 });
               });
             });
@@ -93,28 +92,49 @@ module.exports = {
     this.option('period_length', 'period length, same as --period', String, '1s')
 
     this.option('no_backfill', 'disable backfill', Boolean, true)
+    this.option('subject_prefix', 'Email subject prefix to detect signal', String, 'notifier@tradingview: ')
   },
 
   calculate: function (s) {
-    // initial imap listener
-    if (!imapListener) {
-      imapListener = initImap(conf.emailSignal)
-    }
+
   },
 
   onPeriod: function (s, cb) {
+
+    // initial options
+    if (!imapListener) {
+      imapListener = initImap(conf.emailSignal)
+      console.log('Imap initail done!')
+    }
+
+    if (!tradingTicker) {
+      tradingTicker = s.options.selector.asset
+      console.log('Trading ticker: ', tradingTicker)
+    }
+
+    // email signal received
     if (emailSignal) {
-      if (emailSignal === 'sell') {
-        s.signal = 'sell'
+      var strategySignal = null
+      // make sure the signal is for the curent trade (correct asset)
+      if (emailSignal.includes(tradingTicker)) {
+        if (emailSignal.includes('sell')) {
+          strategySignal = 'sell'
+        }
+        else if (emailSignal.includes('buy')) {
+          strategySignal = 'buy'
+        }
       }
-      else if (emailSignal === 'buy') {
-        s.signal = 'buy'
-      } else {
-        s.signal = null
-      }
+
+      console.log('Email signal recieved: ', strategySignal)
+      // setting signal for strategy
+      s.signal = strategySignal
       // reset external signal
       emailSignal = null
+    } else {
+      // when no signal revieved do not action any thing
+      s.signal = null
     }
+
     cb()
   },
 
