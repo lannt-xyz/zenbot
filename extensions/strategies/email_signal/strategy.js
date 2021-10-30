@@ -3,7 +3,7 @@ var z = require('zero-fill')
   , Imap = require('imap')
   , conf = require('../../../conf')
   , emailSignal = null
-  , imapListener = null
+  , imapListening = false
   , tradingTicker = null;
 
 function initImap(mailSignalOptions) {
@@ -24,12 +24,12 @@ function initImap(mailSignalOptions) {
   }
 
   imap.once('ready', function () {
-    console.log("Imap ready");
+    console.log('[Imap]', 'ready to listening');
     openInbox(function (err, box) {
       if (err) throw err;
       imap.on('mail', function (mail) {
         console.log('')
-        console.log(mail, ' new email comming')
+        console.log('[Imap]', mail, ' new email comming')
 
         imap.openBox('INBOX', true, function (err, box) {
           if (err) throw err;
@@ -60,9 +60,13 @@ function initImap(mailSignalOptions) {
                 stream.once('end', function () {
                   var mailHeader = Imap.parseHeader(buffer);
                   emailSignal = mailHeader['subject'][0];
-                  console.log('Email subject recieved: ', emailSignal)
+                  console.log('[Imap]', 'Email subject recieved: ', emailSignal)
                 });
               });
+            });
+            f.once('error', function(err) {
+              imapListening = false
+              console.log('[Imap]', 'Fetch error: ' + err);
             });
           });
         });
@@ -71,11 +75,12 @@ function initImap(mailSignalOptions) {
   });
 
   imap.once('error', function (err) {
-    console.log(err);
+    imapListening = false
+    console.log('[Imap]', err);
   });
 
   imap.once('end', function () {
-    console.log('Connection ended');
+    console.log('[Imap]', 'Connection ended');
   });
 
   imap.connect();
@@ -102,8 +107,9 @@ module.exports = {
   onPeriod: function (s, cb) {
 
     // initial options
-    if (!imapListener) {
-      imapListener = initImap(conf.emailSignal)
+    if (imapListening === false) {
+      initImap(conf.emailSignal)
+      imapListening = true
       console.log('Imap initail done!')
     }
 
@@ -136,12 +142,6 @@ module.exports = {
     }
 
     cb()
-  },
-
-  onReport: function (s) {
-    var cols = []
-    cols.push(z(s.signal, ' ')[s.signal === false ? 'red' : 'green'])
-    return cols
   },
 
   phenotypes: {
