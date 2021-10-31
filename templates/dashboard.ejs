@@ -503,48 +503,7 @@
 <!-- ============================================================== -->
 <!-- End Wrapper -->
 <!-- ============================================================== -->
-<!-- ============================================================== -->
-<!-- All Jquery -->
-<!-- ============================================================== -->
-<!-- Webpack compiled -->
-<script src="assets-wp/app.bundle.js"></script>
-<!--<script src="assets-wp/common.bundle.js"></script>-->
 
-<script>
-
-    var xmlhttp = new XMLHttpRequest();
-    xmlhttp.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-            var myObj = JSON.parse(this.responseText);
-
-            var row = "";
-            for (s = 0; s < myObj.length; s++) {
-                if(s==25)
-                    break;
-
-                row += "<tr>";
-                row += "<td class='text-center'>" + myObj[s].rank + "</td>";
-                row += "<td><div class='s-s-"+myObj[s].id+" currency-logo-sprite'></div>" + myObj[s].name + " ("+myObj[s].symbol+")" +  "</td>";
-                row += "<td class='text-right'>" + new Intl.NumberFormat("en-US", {style: "currency", currency: "USD", minimumSignificantDigits: 2, maximumSignificantDigits: 6}).format(myObj[s].price_usd) + "</td>";
-                row += "<td class='text-right hidden-xs'>" + new Intl.NumberFormat("en-US", {minimumSignificantDigits: 2, maximumSignificantDigits: 6}).format(myObj[s].price_btc) + " BTC</td>";
-                row += "<td class='text-right hidden-xs hidden-sm'>" + new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(myObj[s]["24h_volume_usd"]) + "</td>";
-                row += "<td class='text-right hidden-xs hidden-sm'>" + new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(myObj[s].market_cap_usd) + "</td>";
-                row += "<td class='text-right hidden-xs hidden-sm'>" + new Intl.NumberFormat("en-US").format(myObj[s].total_supply) + " " + myObj[s].symbol + "</td>";
-                row += "<td class='text-right'><span class='text-"+((myObj[s].percent_change_1h > 0) ? 'success' : 'danger' )+"'>" + new Intl.NumberFormat("en-US", {style: "percent", minimumSignificantDigits: 2}).format(myObj[s].percent_change_1h/100) + "</span></td>";
-                row += "<td class='text-right'><span class='text-"+((myObj[s].percent_change_24h > 0) ? 'success' : 'danger' )+"'>" + new Intl.NumberFormat("en-US", {style: "percent", minimumSignificantDigits: 2}).format(myObj[s].percent_change_24h/100) + "</span></td>";
-                row += "<td class='text-right'><span class='text-"+((myObj[s].percent_change_7d > 0) ? 'success' : 'danger' )+"'>" + new Intl.NumberFormat("en-US", {style: "percent", minimumSignificantDigits: 2}).format(myObj[s].percent_change_7d/100) + "</span></td>";
-                row += "</tr>";
-            }
-
-
-            document.getElementById("market_data").innerHTML = row;
-        }
-
-    };
-
-
-    xmlhttp.open("GET", "https://api.coinmarketcap.com/v1/ticker/", true);
-    xmlhttp.send();
 </script>
 </body>
 
