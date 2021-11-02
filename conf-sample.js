@@ -269,3 +269,10 @@ c.output.api.on = process.env.ZENBOT_API_ENABLE || true
 c.output.api.ip = process.env.ZENBOT_API_IP || '0.0.0.0' // IPv4 or IPv6 address to listen on, uses all available interfaces if omitted
 c.output.api.port = process.env.ZENBOT_API_PORT || 17365
 c.output.api.context = process.env.ZENBOT_API_CONTEXT || ''
+
+c.emailSignal = {}
+c.emailSignal.username = process.env.ZENBOT_MAIL_SIGNAL_USERNAME || ''
+c.emailSignal.password = process.env.ZENBOT_MAIL_SIGNAL_PASSWORD || ''
+c.emailSignal.host = process.env.ZENBOT_MAIL_SIGNAL_HOST || 'imap.gmail.com' // gmail imap server
+c.emailSignal.port = process.env.ZENBOT_MAIL_SIGNAL_PORT || 993
+c.emailSignal.port = process.env.ZENBOT_MAIL_SIGNAL_PREFIX || ''

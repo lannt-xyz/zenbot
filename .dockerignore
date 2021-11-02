@@ -9,3 +9,4 @@ Dockerfile
 .gitignore
 .dockerignore
 .github/
+conf.js
