@@ -275,4 +275,4 @@ c.emailSignal.username = process.env.ZENBOT_MAIL_SIGNAL_USERNAME || ''
 c.emailSignal.password = process.env.ZENBOT_MAIL_SIGNAL_PASSWORD || ''
 c.emailSignal.host = process.env.ZENBOT_MAIL_SIGNAL_HOST || 'imap.gmail.com' // gmail imap server
 c.emailSignal.port = process.env.ZENBOT_MAIL_SIGNAL_PORT || 993
-c.emailSignal.port = process.env.ZENBOT_MAIL_SIGNAL_PREFIX || ''
+c.emailSignal.subjectPrefix = process.env.ZENBOT_MAIL_SIGNAL_SUBJECT_PREFIX || ''

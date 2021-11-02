@@ -30,7 +30,6 @@ function initImap(mailSignalOptions, callback, tradingTicker) {
       rejectUnauthorized: false
     }
   });
-  var subjectPrefix = mailSignalOptions.subjectPrefix
 
   function openInbox(cb) {
     imap.openBox('INBOX', false, cb);
@@ -48,7 +47,7 @@ function initImap(mailSignalOptions, callback, tradingTicker) {
           if (err) throw err;
           var searchConditions = [
             'UNSEEN',
-            ['SUBJECT', subjectPrefix]
+            ['SUBJECT', mailSignalOptions.subjectPrefix]
           ];
           imap.esearch(searchConditions, ['MAX'], function (err, results) {
             if (err) throw err;
@@ -64,7 +63,6 @@ function initImap(mailSignalOptions, callback, tradingTicker) {
             }
             var f = imap.fetch(results['max'], fetchOptions);
             f.on('message', function (msg, seqno) {
-              var prefix = '(#' + seqno + ') ';
               msg.on('body', function (stream, info) {
                 var buffer = '';
                 stream.on('data', function (chunk) {
@@ -74,28 +72,23 @@ function initImap(mailSignalOptions, callback, tradingTicker) {
                   var mailHeader = Imap.parseHeader(buffer);
                   var emailSignal = mailHeader['subject'][0];
                   console.log('[Imap]', 'Email subject recieved: ', emailSignal)
-                  var strategySignal = null
+                  var signalCommand = null
                   if (emailSignal.includes(tradingTicker)) {
                     if (emailSignal.includes('sell')) {
-                      strategySignal = 'sell'
+                      signalCommand = 'S'
                     }
                     else if (emailSignal.includes('buy')) {
-                      strategySignal = 'buy'
+                      signalCommand = 'B'
                     }
                   }
 
-                  if (!strategySignal) {
+                  if (!signalCommand) {
                     return
                   }
 
-                  console.log('[Imap]', 'Start to execute strategy signal: ', strategySignal)
-                  if (strategySignal === 'buy') {
-                    callback('B')
-                  }
-                  if (strategySignal === 'sell') {
-                    callback('S')
-                  }
-                  console.log('[Imap]', 'End to execute strategy signal: ', strategySignal)
+                  console.log('[Imap]', 'Start to execute strategy signal: ', signalCommand)
+                  callback(signalCommand)
+                  console.log('[Imap]', 'End to execute strategy signal: ', signalCommand)
                 });
               });
             });
@@ -208,14 +201,6 @@ module.exports = function (program, conf) {
       var engine = engineFactory(s, conf)
       var collectionServiceInstance = collectionService(conf)
       if (!so.min_periods) so.min_periods = 1
-
-      ///// Initial Imap /////
-      if (!imapListening) {
-        var tradingTicker = so.selector.asset
-        initImap(conf.emailSignal, executeCommand, tradingTicker);
-        imapListening = true;
-      }
-      ///// Initial Imap /////
 
       const keyMap = new Map()
       keyMap.set('b', 'limit'.grey + ' BUY'.green)
@@ -680,14 +665,9 @@ module.exports = function (program, conf) {
 
                   forwardScan()
                   setInterval(forwardScan, so.poll_trades)
-                  // if (!so.non_interactive) {
-                  //   engine.onMessage(executeCommand)
-                  // }
-                  // readline.emitKeypressEvents(process.stdin)
-                  // if (!so.non_interactive && process.stdin.setRawMode) {
-                  //   process.stdin.setRawMode(true)
-                  //   process.stdin.on('keypress', executeKey)
-                  // }
+
+                  retryImap()
+                  setInterval(retryImap, so.poll_trades)
                 })
               })
               return
@@ -703,6 +683,16 @@ module.exports = function (program, conf) {
         engine.writeHeader()
         getNext()
       })
+
+      function retryImap() {
+        ///// Initial Imap /////
+        if (!imapListening) {
+          var tradingTicker = so.selector.asset
+          initImap(conf.emailSignal, executeCommand, tradingTicker);
+          imapListening = true;
+        }
+        ///// Initial Imap /////
+      }
 
       var prev_timeout = null
       function forwardScan() {
