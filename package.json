@@ -40,7 +40,7 @@
     "bl": "^4.0.3",
     "bollinger-bands": "^3.0.2",
     "bootstrap": "^4.6.0",
-    "ccxt": "^1.52.26",
+    "ccxt": "^1.60.27",
     "cexio-api-node": "^1.0.8",
     "cliff": "^0.1.10",
     "coinbase-pro": "^0.9.0",
@@ -49,7 +49,7 @@
     "convnetjs": "0.3.0",
     "counterup": "^1.0.2",
     "css-loader": "^5.2.6",
-    "echarts": "^4.9.0",
+    "echarts": "^5.2.1",
     "ejs": "^3.1.6",
     "exports-loader": "^0.7.0",
     "expose-loader": "^1.0.3",
@@ -112,7 +112,7 @@
     "webpack-cli": "^4.7.2",
     "ws": "^7.5.1",
     "zero-fill": "^2.2.4",
-    "snyk": "^1.652.0",
+    "snyk": "^1.685.0",
     "imap": "^0.8.19"
   },
   "devDependencies": {
