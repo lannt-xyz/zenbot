@@ -6,9 +6,11 @@ const ccxt = require('ccxt')
 
 module.exports = function binance (conf) {
   var public_client, authed_client
+  var timeout = 50000
 
   function publicClient () {
     if (!public_client) public_client = new ccxt.binance({ 'apiKey': '', 'secret': '', 'options': { 'adjustForTimeDifference': true } })
+    public_client.timeout = timeout
     return public_client
   }
 
@@ -19,6 +21,7 @@ module.exports = function binance (conf) {
       }
       authed_client = new ccxt.binance({ 'apiKey': conf.binance.key, 'secret': conf.binance.secret, 'options': { 'adjustForTimeDifference': true }, enableRateLimit: true })
     }
+    authed_client.timeout = timeout
     return authed_client
   }
 
