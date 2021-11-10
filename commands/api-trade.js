@@ -650,7 +650,6 @@ module.exports = function (program, conf) {
             })
           })
         }
-        // engine.writeHeader()
         getNext()
       })
 
@@ -836,7 +835,7 @@ module.exports = function (program, conf) {
           }
           marker.to = marker.to ? Math.max(marker.to, trade_cursor) : trade_cursor
           marker.newest_time = Math.max(marker.newest_time, trade.time)
-          trades.save(trade, function (err) {
+          trades.insertOne(trade, function (err) {
             // ignore duplicate key errors
             if (err && err.code !== 11000) {
               console.error('\n' + moment().format('YYYY-MM-DD HH:mm:ss') + ' - error saving trade')
