@@ -19,15 +19,16 @@ var tb = require('timebucket')
   , app = express()
   , random_port = require('random-port');
 
-function startApi(apiConf, callback, tradingTicker) {
+var baseAsset = null;
+
+function startApi(baseS, baseConf, executeCommand) {
+
+  var conf = Object.assign({}, baseConf)
+  var s = Object.assign({}, baseS)
+  var apiConf = conf.apiSignal
   const router = express.Router()
 
   let commandHandle = function (asset, action) {
-
-    if (asset.toUpperCase() != tradingTicker.toUpperCase()) {
-      console.log('[API]', 'not is the target signal: ', asset)
-      return
-    }
 
     var signalCommand = null;
     if (action.toUpperCase() === 'SELL') {
@@ -42,8 +43,12 @@ function startApi(apiConf, callback, tradingTicker) {
       return
     }
 
+    var so = s.options
     console.log('[API]', 'Start to execute strategy signal: ', signalCommand)
-    callback(signalCommand)
+    var newNormalizedSelector = so.selector.normalized
+    newNormalizedSelector = newNormalizedSelector.replace(baseAsset, asset.toUpperCase())
+    var newSelector = objectifySelector(newNormalizedSelector)
+    executeCommand(newSelector, signalCommand === 'B' ? 'buy' : 'sell', null, null, false, true)
     console.log('[API]', 'End to execute strategy signal: ', signalCommand)
   }
 
@@ -51,6 +56,7 @@ function startApi(apiConf, callback, tradingTicker) {
 
     router.post('/signal', function (req, res) {
       var data = req.body
+      console.log('[API]', 'signal recieved:', data)
       commandHandle(data.asset, data.action)
       res.status(200)
       res.send('')
@@ -627,7 +633,8 @@ module.exports = function (program, conf) {
                     s.lookback.splice(-1, 1)
                   }
 
-                  startApi(conf.apiSignal, executeCommand, so.selector.asset)
+                  baseAsset = so.selector.asset
+                  startApi(s, conf, engine.executeSignalWithSelector)
 
                   forwardScan()
                   setInterval(forwardScan, so.poll_trades)
@@ -643,7 +650,7 @@ module.exports = function (program, conf) {
             })
           })
         }
-        engine.writeHeader()
+        // engine.writeHeader()
         getNext()
       })
 
