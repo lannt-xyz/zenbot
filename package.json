@@ -40,7 +40,7 @@
     "bl": "^4.0.3",
     "bollinger-bands": "^3.0.2",
     "bootstrap": "^4.6.0",
-    "ccxt": "^1.60.27",
+    "ccxt": "^1.52.26",
     "cexio-api-node": "^1.0.8",
     "cliff": "^0.1.10",
     "coinbase-pro": "^0.9.0",
@@ -112,8 +112,7 @@
     "webpack-cli": "^4.7.2",
     "ws": "^7.5.1",
     "zero-fill": "^2.2.4",
-    "snyk": "^1.685.0",
-    "imap": "^0.8.19"
+    "snyk": "^1.685.0"
   },
   "devDependencies": {
     "eslint": "^4.19.1",
