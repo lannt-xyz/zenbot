@@ -32,10 +32,10 @@ function startApi(baseS, baseConf, executeCommand) {
 
     var signalCommand = null;
     if (action.toUpperCase() === 'SELL') {
-      signalCommand = 'S'
+      signalCommand = 'sell'
     }
     else if (action.toUpperCase() === 'BUY') {
-      signalCommand = 'B'
+      signalCommand = 'buy'
     }
 
     if (!signalCommand) {
@@ -47,8 +47,11 @@ function startApi(baseS, baseConf, executeCommand) {
     console.log('[API]', 'Start to execute strategy signal: ', signalCommand)
     var newNormalizedSelector = so.selector.normalized
     newNormalizedSelector = newNormalizedSelector.replace(baseAsset, asset.toUpperCase())
+    var currency = so.selector.currency
+    newNormalizedSelector = newNormalizedSelector.replace(currency, '')
     var newSelector = objectifySelector(newNormalizedSelector)
-    executeCommand(newSelector, signalCommand === 'B' ? 'buy' : 'sell', null, null, false, true)
+    console.log('[API]', 'new selector: \n', newSelector)
+    executeCommand(newSelector, signalCommand, null, null, false, true)
     console.log('[API]', 'End to execute strategy signal: ', signalCommand)
   }
 
