@@ -281,3 +281,4 @@ c.apiSignal = {}
 c.apiSignal.ip = process.env.ZENBOT_API_SIGNAL_IP || '0.0.0.0'
 c.apiSignal.port = process.env.ZENBOT_API_SIGNAL_PORT || 18365
 c.apiSignal.context = process.env.ZENBOT_API_SIGNAL_CONTEXT || ''
+c.apiSignal.numberOfAsset = process.env.ZENBOT_API_NUMBER_OF_ASSET || 1

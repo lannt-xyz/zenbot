@@ -15,6 +15,9 @@ var minimist = require('minimist')
 
 var notifier = null
 var commandExecuting = false
+var initialBuyPct = 99
+var numberOfAsset = 1
+var tradingAsset = []
 
 function execute(s, conf, selector, command, retryTimes) {
   
@@ -37,9 +40,17 @@ function execute(s, conf, selector, command, retryTimes) {
   commandExecuting = true
 
   conf.notifiers = {}
+  // calculate percent to trade
+  // Percent to trade on one asset = round( c.buy_pct / (number of total asset - number of trading asset) )
+  var tradingPct = initialBuyPct / (numberOfAsset - tradingAsset.length)
+  tradingPct = Math.floor(tradingPct)
+  conf.buy_pct = tradingPct
+
   var so = s.options
   so.selector = selector
   so.stats = true
+  so.buy_pct = tradingPct
+
   var checkOrderInterval = null
   var engine = engineFactory(s, conf)
   engine.executeSignal(command, function (err, order) {
@@ -62,6 +73,15 @@ function execute(s, conf, selector, command, retryTimes) {
         `${asset_qty} at ${currency_price}\n` +
         `total ${total_price}\n`
       console.log('[API]', (order_complete).cyan)
+
+      // if is buy command, add asset to trading list
+      if (command === 'buy') {
+        tradingAsset.push(selector.asset)
+      } else {
+        // if is sell command, remove asset from trading list
+        tradingAsset = tradingAsset.filter(function(f) { return f !== selector.asset })
+      }
+
       pushMessage(`${command} ${s.exchange.name.toUpperCase()}`, order_complete, so)
     }
 
@@ -102,6 +122,9 @@ function startApi(baseS, baseConf) {
   var conf = Object.assign({}, baseConf)
   var s = Object.assign({}, baseS)
   var apiConf = conf.apiSignal
+  numberOfAsset = apiConf.numberOfAsset
+  initialBuyPct = conf.buy_pct
+
   const router = express.Router()
 
   let commandHandle = function (ticker, action) {
