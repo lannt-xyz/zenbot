@@ -11,13 +11,15 @@ var minimist = require('minimist')
   , { formatAsset, formatCurrency } = require('../lib/format')
   , express = require('express')
   , app = express()
-  , random_port = require('random-port');
+  , random_port = require('random-port')
+  , apiTradeService = require('../lib/services/api-trade-service');
 
 var notifier = null
 var commandExecuting = false
 var initialBuyPct = 99
 var numberOfAsset = 1
 var tradingAsset = []
+var apiTradingServiceInstance = null
 
 function execute(s, conf, selector, command, retryTimes) {
   
@@ -124,6 +126,14 @@ function startApi(baseS, baseConf) {
   var apiConf = conf.apiSignal
   numberOfAsset = apiConf.numberOfAsset
   initialBuyPct = conf.buy_pct
+  // sync on trading list
+  apiTradingServiceInstance = apiTradeService(conf)
+  apiTradingServiceInstance.getOnTrading().find({}).toArray(function(err, res) {
+    tradingAsset = res.map(x => x.asset);
+    console.log('------Current Trading Asset-------')
+    console.log(tradingAsset)
+    console.log('------Current Trading Asset-------')
+  })
 
   const router = express.Router()
 
