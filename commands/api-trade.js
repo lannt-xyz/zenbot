@@ -42,6 +42,21 @@ function syncTradingAsset() {
     })
 }
 
+function saveOrder(command, asset, size, price, time) {
+  var order = {
+    command: command,
+    asset: asset,
+    size: size,
+    price: price,
+    time: time
+  }
+  apiTradingServiceInstance.getOrders()
+    .insertOne(order)
+    .catch(function (err) {
+      console.log(err)
+    })
+}
+
 function execute(s, conf, selector, command, retryTimes) {
   
   if (commandExecuting) {
@@ -83,7 +98,7 @@ function execute(s, conf, selector, command, retryTimes) {
     }
     if (!order) {
       console.error('[API]', 'order unsuccess!')
-      console.log('[API]', 'may be the order is too small')
+      console.log('[API]', 'maybe the order is too small!')
 
       commandExecuting = false
       if (checkOrderInterval) {
@@ -95,7 +110,7 @@ function execute(s, conf, selector, command, retryTimes) {
     }
 
     if (order.status === 'done') {
-      let time = new Date(order.done_at).getTime()
+      let time = new Date(order.time).getTime()
       let asset_qty = formatAsset(order.size, s.asset)
       let currency_price = formatCurrency(order.price, s.currency)
       let total_price = formatCurrency(order.size * order.price, s.currency)
@@ -114,6 +129,8 @@ function execute(s, conf, selector, command, retryTimes) {
       }
       // Sync tradingAssetList
       syncTradingAsset()
+      // Save Order
+      saveOrder(command, s.asset, order.size, order.price, order.time)
 
       pushMessage(`${command} ${s.exchange.name.toUpperCase()}`, order_complete, so)
     }
