@@ -21,6 +21,27 @@ var numberOfAsset = 1
 var tradingAsset = []
 var apiTradingServiceInstance = null
 
+function syncTradingAsset() {
+  // remove all item of asset from on-trading asset list
+  apiTradingServiceInstance.getOnTrading().deleteMany({});
+  var tradingAssetObject = tradingAsset.map(x => {
+    return {
+      asset: x  
+    }
+  });
+
+  if (tradingAssetObject.length === 0) {
+    return
+  }
+
+  // insert again for the new asset list
+  apiTradingServiceInstance.getOnTrading()
+    .insertMany(tradingAssetObject)
+    .catch(function (err) {
+      console.log(err)
+    })
+}
+
 function execute(s, conf, selector, command, retryTimes) {
   
   if (commandExecuting) {
@@ -62,7 +83,15 @@ function execute(s, conf, selector, command, retryTimes) {
     }
     if (!order) {
       console.error('[API]', 'order unsuccess!')
-      process.exit()
+      console.log('[API]', 'may be the order is too small')
+
+      commandExecuting = false
+      if (checkOrderInterval) {
+        console.log('[API]', 'clear interval')
+        clearInterval(checkOrderInterval)
+      }
+      
+      return
     }
 
     if (order.status === 'done') {
@@ -83,6 +112,8 @@ function execute(s, conf, selector, command, retryTimes) {
         // if is sell command, remove asset from trading list
         tradingAsset = tradingAsset.filter(function(f) { return f !== selector.asset })
       }
+      // Sync tradingAssetList
+      syncTradingAsset()
 
       pushMessage(`${command} ${s.exchange.name.toUpperCase()}`, order_complete, so)
     }
