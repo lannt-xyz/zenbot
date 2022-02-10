@@ -214,6 +214,11 @@ function startApi(baseS, baseConf) {
 
   let startServer = function (port, ip, apiContext) {
 
+    router.get('/health-check', function (req, res) {
+      res.status(200)
+      res.send('working')
+    })
+
     router.post('/signal', function (req, res) {
       var data = req.body
       console.log('[API]', 'signal recieved:', data)
